@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Home as HomeIcon, Search as SearchIcon, Library } from 'lucide-react';
-import type { View, Song, PlayerMode } from '@/types';
+import { Home as HomeIcon, Search as SearchIcon, Library, Loader2 } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
+import type { View, Song, PlayerMode, UserProfile } from '@/types';
 import { songs, playlists, artists, albums, getSongsByIds } from '@/data/mockData';
 import { usePlayer } from '@/hooks/usePlayer';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useAuth } from '@/hooks/useAuth';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
 import { PlayerBar } from '@/components/PlayerBar';
@@ -11,14 +13,27 @@ import { YouTubePlayerView } from '@/components/YouTubePlayerView';
 import { HomeView } from '@/views/HomeView';
 import { SearchView } from '@/views/SearchView';
 import { LibraryView } from '@/views/LibraryView';
+import { AuthView } from '@/views/AuthView';
+
+function userToProfile(u: User): UserProfile {
+  return {
+    id: u.id,
+    name: u.user_metadata?.full_name || u.user_metadata?.name || u.email || 'Usuário',
+    email: u.email ?? '',
+    avatarUrl: u.user_metadata?.avatar_url || u.user_metadata?.picture || '',
+  };
+}
 
 function App() {
   const [view, setView] = useState<View>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [playerMode, setPlayerMode] = useState<PlayerMode>('video');
 
+  const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const player = usePlayer();
   const { favorites, toggleFavorite, isFavorite } = useFavorites();
+
+  const profile: UserProfile | null = user ? userToProfile(user) : null;
 
   const favoriteSongs = useMemo(
     () => getSongsByIds([...favorites]),
@@ -35,6 +50,20 @@ function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-black text-white">
+        <Loader2 size={32} className="animate-spin text-emerald-400" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <AuthView onSignInWithGoogle={signInWithGoogle} loading={authLoading} />
+    );
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-black overflow-hidden text-white select-none">
       <div className="flex flex-1 overflow-hidden">
@@ -42,6 +71,8 @@ function App() {
           currentView={view}
           onNavigate={setView}
           favoriteCount={favorites.size}
+          user={profile}
+          onSignOut={signOut}
         />
 
         <main className="flex-1 overflow-y-auto bg-gradient-to-b from-neutral-900 to-black rounded-lg mr-2 max-md:rounded-none max-md:mr-0">

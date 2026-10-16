@@ -1,5 +1,12 @@
 export type View = 'home' | 'search' | 'library';
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string;
+}
+
 export type PlayerMode = 'video' | 'audio';
 
 export interface Song {

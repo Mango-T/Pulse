@@ -1,10 +1,13 @@
-import { Home, Search, Library, Heart } from 'lucide-react';
+import { Chrome as Home, Search, Library, Heart, LogOut } from 'lucide-react';
 import type { View } from '@/types';
+import type { UserProfile } from '@/types';
 
 interface SidebarProps {
   currentView: View;
   onNavigate: (view: View) => void;
   favoriteCount: number;
+  user: UserProfile | null;
+  onSignOut: () => void;
 }
 
 interface NavItem {
@@ -19,7 +22,7 @@ const navItems: NavItem[] = [
   { id: 'library', label: 'Minha Biblioteca', icon: Library },
 ];
 
-export function Sidebar({ currentView, onNavigate, favoriteCount }: SidebarProps) {
+export function Sidebar({ currentView, onNavigate, favoriteCount, user, onSignOut }: SidebarProps) {
   return (
     <aside className="flex flex-col gap-2 w-60 shrink-0 p-2 max-md:hidden">
       <div className="flex items-center gap-2.5 px-3 py-5">
@@ -74,6 +77,29 @@ export function Sidebar({ currentView, onNavigate, favoriteCount }: SidebarProps
           )}
         </div>
       </div>
+
+      {/* User profile */}
+      {user && (
+        <div className="bg-neutral-900/80 rounded-xl p-3 flex items-center gap-3">
+          <img
+            src={user.avatarUrl}
+ alt={user.name}
+            className="w-9 h-9 rounded-full object-cover shrink-0"
+            referrerPolicy="no-referrer"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-white text-sm font-semibold truncate">{user.name}</p>
+            <p className="text-neutral-500 text-xs truncate">{user.email}</p>
+          </div>
+          <button
+            onClick={onSignOut}
+            title="Sair"
+            className="text-neutral-400 hover:text-white transition-colors shrink-0 p-1.5 rounded-lg hover:bg-neutral-800/60"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
