@@ -150,30 +150,6 @@ export function SearchView({
     playlistQueryIdRef.current += 1;
   }, [trimmed]);
 
-    if (!isYouTubeConfigured()) {
-      setYtPlaylists([]);
-      return;
-    }
-
-    const id = ++playlistQueryIdRef.current;
-    setYtPlaylistsLoading(true);
-    setYtPlaylistsError(null);
-    ytPlaylistsSearchDoneRef.current = false;
-
-    const timer = setTimeout(async () => {
-      const result = await searchYouTubePlaylists(query.trim());
-      if (id !== playlistQueryIdRef.current) return;
-      setYtPlaylists(result.playlists);
-      setYtPlaylistsError(result.error);
-      setYtPlaylistsNextPage(result.nextPageToken);
-      setYtPlaylistsLoading(false);
-      ytPlaylistsSearchDoneRef.current = true;
-    }, 600);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trimmed]);
-
   const handleLoadMorePlaylists = useCallback(async () => {
     if (!ytPlaylistsNextPage || ytPlaylistsLoadingMore) return;
     setYtPlaylistsLoadingMore(true);
