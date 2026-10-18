@@ -141,6 +141,8 @@ export function SearchView({
   const playlistQueryIdRef = useRef(0);
   const ytPlaylistsSearchDoneRef = useRef(false);
 
+    // YouTube playlist search — temporarily disabled to preserve API quota.
+  // Keep the state and pagination logic for possible future reactivation.
   useEffect(() => {
     setYtPlaylists([]);
     setYtPlaylistsError(null);
