@@ -1,11 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Youtube, Loader2, AlertCircle } from 'lucide-react';
-import type { Song, Channel } from '@/types';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Search, Youtube, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import type { Song, Channel, YTPlaylist } from '@/types';
 import { SongRow } from '@/components/SongRow';
 import { MediaCard } from '@/components/MediaCard';
 import { ChannelAvatar } from '@/components/ChannelAvatar';
 import { songs as allSongs, playlists, artists, albums } from '@/data/mockData';
-import { searchYouTube, searchYouTubeChannels, isYouTubeConfigured } from '@/lib/youtube';
+import { searchYouTube, searchYouTubeChannels, searchYouTubePlaylists, isYouTubeConfigured } from '@/lib/youtube';
+
+type SearchFilter = 'all' | 'videos' | 'channels' | 'playlists';
+
+const filterTabs: { id: SearchFilter; label: string }[] = [
+  { id: 'all', label: 'Tudo' },
+  { id: 'videos', label: 'Vídeos' },
+  { id: 'channels', label: 'Canais e artistas' },
+  { id: 'playlists', label: 'Playlists' },
+];
 
 interface SearchViewProps {
   query: string;
@@ -15,6 +24,7 @@ interface SearchViewProps {
   onPlaySong: (song: Song, queue: Song[]) => void;
   onToggleFavorite: (songId: string) => void;
   onOpenChannel: (channelId: string) => void;
+  onOpenPlaylist: (playlist: YTPlaylist) => void;
 }
 
 export function SearchView({
@@ -25,8 +35,10 @@ export function SearchView({
   onPlaySong,
   onToggleFavorite,
   onOpenChannel,
+  onOpenPlaylist,
 }: SearchViewProps) {
   const trimmed = query.trim().toLowerCase();
+  const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
 
   const results = useMemo(() => {
     if (!trimmed) return null;
@@ -121,6 +133,68 @@ export function SearchView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimmed]);
 
+  // YouTube playlist search — independent state and pagination
+  const [ytPlaylists, setYtPlaylists] = useState<YTPlaylist[]>([]);
+  const [ytPlaylistsLoading, setYtPlaylistsLoading] = useState(false);
+  const [ytPlaylistsError, setYtPlaylistsError] = useState<string | null>(null);
+  const [ytPlaylistsNextPage, setYtPlaylistsNextPage] = useState<string | null>(null);
+  const [ytPlaylistsLoadingMore, setYtPlaylistsLoadingMore] = useState(false);
+  const playlistQueryIdRef = useRef(0);
+  const ytPlaylistsSearchDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (!trimmed) {
+      setYtPlaylists([]);
+      setYtPlaylistsError(null);
+      setYtPlaylistsLoading(false);
+      setYtPlaylistsNextPage(null);
+      ytPlaylistsSearchDoneRef.current = false;
+      return;
+    }
+
+    if (!isYouTubeConfigured()) {
+      setYtPlaylists([]);
+      return;
+    }
+
+    const id = ++playlistQueryIdRef.current;
+    setYtPlaylistsLoading(true);
+    setYtPlaylistsError(null);
+    ytPlaylistsSearchDoneRef.current = false;
+
+    const timer = setTimeout(async () => {
+      const result = await searchYouTubePlaylists(query.trim());
+      if (id !== playlistQueryIdRef.current) return;
+      setYtPlaylists(result.playlists);
+      setYtPlaylistsError(result.error);
+      setYtPlaylistsNextPage(result.nextPageToken);
+      setYtPlaylistsLoading(false);
+      ytPlaylistsSearchDoneRef.current = true;
+    }, 600);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trimmed]);
+
+  const handleLoadMorePlaylists = useCallback(async () => {
+    if (!ytPlaylistsNextPage || ytPlaylistsLoadingMore) return;
+    setYtPlaylistsLoadingMore(true);
+
+    const result = await searchYouTubePlaylists(query.trim(), ytPlaylistsNextPage);
+    if (result.error) {
+      setYtPlaylistsError(result.error);
+    } else {
+      setYtPlaylists((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newPlaylists = result.playlists.filter((p) => !existingIds.has(p.id));
+        return [...prev, ...newPlaylists];
+      });
+      setYtPlaylistsNextPage(result.nextPageToken);
+      setYtPlaylistsError(null);
+    }
+    setYtPlaylistsLoadingMore(false);
+  }, [ytPlaylistsNextPage, ytPlaylistsLoadingMore, query]);
+
   // Combined artists & channels — merge local matched artists with YT channels, dedup by name
   const combinedChannels: Channel[] = useMemo(() => {
     const localChannels: Channel[] = (results?.matchedArtists ?? []).map((a) => ({
@@ -184,12 +258,14 @@ export function SearchView({
       results.matchedArtists.length > 0 ||
       results.matchedAlbums.length > 0);
 
-  const hasYtResults = ytResults.length > 0;
-  const hasChannelResults = combinedChannels.length > 0;
-  const channelsStillLoading = ytChannelsLoading && !hasChannelResults;
+  const hasYtPlaylists = ytPlaylists.length > 0;
+  const ytPlaylistsStillLoading = ytPlaylistsLoading && !hasYtPlaylists;
+  const hasLocalPlaylists = !!(results && results.matchedPlaylists.length > 0);
+  const hasAnyPlaylists = hasLocalPlaylists || hasYtPlaylists;
+
   const showNoResults =
-    !hasLocalResults && !hasYtResults && !hasChannelResults &&
-    !ytLoading && !ytError && !channelsStillLoading;
+    !hasLocalResults && !hasYtResults && !hasChannelResults && !hasAnyPlaylists &&
+    !ytLoading && !ytError && !channelsStillLoading && !ytPlaylistsStillLoading && !ytPlaylistsError;
 
   if (showNoResults) {
     return (
@@ -203,10 +279,31 @@ export function SearchView({
     );
   }
 
+  const showChannels = activeFilter === 'all' || activeFilter === 'channels';
+  const showVideos = activeFilter === 'all' || activeFilter === 'videos';
+  const showPlaylists = activeFilter === 'all' || activeFilter === 'playlists';
+
   return (
     <div className="px-4 md:px-6 pb-6 space-y-8">
+      {/* Filter tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {filterTabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveFilter(tab.id)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              activeFilter === tab.id
+                ? 'bg-white text-black'
+                : 'bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Artistas e canais — horizontal scroll */}
-      {(hasChannelResults || channelsStillLoading) && (
+      {showChannels && (hasChannelResults || channelsStillLoading) && (
         <section>
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-white text-lg font-bold">Artistas e canais</h2>
@@ -234,7 +331,7 @@ export function SearchView({
         </section>
       )}
 
-      {results && results.matchedSongs.length > 0 && (
+      {showVideos && results && results.matchedSongs.length > 0 && (
         <section>
           <h2 className="text-white text-lg font-bold mb-4">Músicas</h2>
           <div className="bg-neutral-900/40 rounded-xl p-2 md:p-4">
@@ -256,7 +353,8 @@ export function SearchView({
         </section>
       )}
 
-      {results && results.matchedPlaylists.length > 0 && (
+      {/* Local playlists */}
+      {showPlaylists && results && results.matchedPlaylists.length > 0 && (
         <section>
           <h2 className="text-white text-lg font-bold mb-4">Playlists</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
@@ -279,7 +377,7 @@ export function SearchView({
         </section>
       )}
 
-      {results && results.matchedAlbums.length > 0 && (
+      {showVideos && results && results.matchedAlbums.length > 0 && (
         <section>
           <h2 className="text-white text-lg font-bold mb-4">Álbuns</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
@@ -302,8 +400,88 @@ export function SearchView({
         </section>
       )}
 
-      {/* YouTube Results */}
-      {trimmed && (
+      {/* YouTube playlist results */}
+      {showPlaylists && trimmed && (
+        <section>
+          <div className="flex items-center gap-2.5 mb-4">
+            <Youtube size={20} className="text-red-500" />
+            <h2 className="text-white text-lg font-bold">Playlists do YouTube</h2>
+            {ytPlaylistsLoading && (
+              <Loader2 size={16} className="text-neutral-400 animate-spin" />
+            )}
+          </div>
+
+          {ytPlaylistsError && (
+            <div className="flex items-start gap-3 bg-red-950/30 border border-red-900/40 rounded-lg p-3 mb-3">
+              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <p className="text-red-400/70 text-xs">{ytPlaylistsError}</p>
+            </div>
+          )}
+
+          {!ytPlaylistsError && ytPlaylistsStillLoading && (
+            <div className="flex items-center gap-3 text-neutral-400 text-sm py-6">
+              <Loader2 size={18} className="animate-spin" />
+              Buscando playlists...
+            </div>
+          )}
+
+          {!ytPlaylistsError && !ytPlaylistsLoading && hasYtPlaylists && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+                {ytPlaylists.map((pl) => (
+                  <div
+                    key={pl.id}
+                    onClick={() => onOpenPlaylist(pl)}
+                    className="group relative bg-neutral-800/40 hover:bg-neutral-800/70 rounded-xl p-3 sm:p-4 cursor-pointer transition-all duration-300 w-full"
+                  >
+                    <div className="relative mb-3 aspect-square w-full">
+                      <img
+                        src={pl.cover}
+                        alt={pl.title}
+                        className="w-full h-full object-cover shadow-lg rounded-lg"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold truncate">{pl.title}</p>
+                      <p className="text-neutral-400 text-xs mt-1 truncate">
+                        {pl.videoCount || pl.channelName}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {ytPlaylistsNextPage && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={handleLoadMorePlaylists}
+                    disabled={ytPlaylistsLoadingMore}
+                    className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white text-sm font-medium rounded-full px-5 py-2.5 transition-colors disabled:opacity-60"
+                  >
+                    {ytPlaylistsLoadingMore ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
+                    Carregar mais
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {!ytPlaylistsError && !ytPlaylistsLoading && !hasYtPlaylists && isYouTubeConfigured() && ytPlaylistsSearchDoneRef.current && (
+            <p className="text-neutral-500 text-sm py-2">
+              Nenhuma playlist encontrada no YouTube para esta busca.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* YouTube Video Results */}
+      {showVideos && trimmed && (
         <section>
           <div className="flex items-center gap-2.5 mb-4">
             <Youtube size={20} className="text-red-500" />

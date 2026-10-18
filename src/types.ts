@@ -1,4 +1,4 @@
-export type View = 'home' | 'search' | 'library' | 'channel';
+export type View = 'home' | 'search' | 'library' | 'channel' | 'playlist';
 
 export interface UserProfile {
   id: string;
@@ -57,4 +57,12 @@ export interface Channel {
   avatar: string;
   description: string;
   isLocal: boolean;
+}
+
+export interface YTPlaylist {
+  id: string;
+  title: string;
+  cover: string;
+  videoCount: string;
+  channelName: string;
 }

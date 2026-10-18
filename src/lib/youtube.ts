@@ -4,6 +4,7 @@ const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
 const SEARCH_ENDPOINT = 'https://www.googleapis.com/youtube/v3/search';
 const CHANNELS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/channels';
 const PLAYLIST_ITEMS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/playlistItems';
+const PLAYLISTS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/playlists';
 
 interface YouTubeSearchItem {
   id: { videoId: string };
@@ -258,5 +259,201 @@ export async function getChannelDetails(channelId: string): Promise<{ channel: C
     };
   } catch {
     return { channel: null, uploadsPlaylistId: null, error: 'Falha de rede ao buscar detalhes do canal.' };
+  }
+}
+
+// --- YouTube Playlists ---
+
+export interface YouTubePlaylistSearchResult {
+  playlists: YTPlaylist[];
+  nextPageToken: string | null;
+  error: string | null;
+}
+
+interface YouTubePlaylistSearchItem {
+  id: { playlistId: string };
+  snippet: {
+    title: string;
+    channelTitle: string;
+    thumbnails: {
+      default?: { url: string };
+      medium?: { url: string };
+      high?: { url: string };
+    };
+  };
+}
+
+export async function searchYouTubePlaylists(
+  query: string,
+  pageToken?: string,
+): Promise<YouTubePlaylistSearchResult> {
+  if (!API_KEY) {
+    return { playlists: [], nextPageToken: null, error: null };
+  }
+
+  const trimmed = query.trim();
+  if (!trimmed) return { playlists: [], nextPageToken: null, error: null };
+
+  const params = new URLSearchParams({
+    part: 'snippet',
+    type: 'playlist',
+    maxResults: '10',
+    q: trimmed,
+    key: API_KEY,
+  });
+  if (pageToken) params.set('pageToken', pageToken);
+
+  try {
+    const res = await fetch(`${SEARCH_ENDPOINT}?${params}`);
+    if (!res.ok) {
+      if (res.status === 403) {
+        return { playlists: [], nextPageToken: null, error: 'Cota da API excedida.' };
+      }
+      return { playlists: [], nextPageToken: null, error: `Erro ao buscar playlists (HTTP ${res.status}).` };
+    }
+
+    const data = await res.json();
+    const items: YouTubePlaylistSearchItem[] = data.items ?? [];
+
+    const result: YTPlaylist[] = items
+      .filter((item) => item.id?.playlistId)
+      .map((item) => ({
+        id: `yt-playlist:${item.id.playlistId}`,
+        title: decodeEntities(item.snippet.title),
+        cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        videoCount: '',
+        channelName: decodeEntities(item.snippet.channelTitle),
+      }));
+
+    return { playlists: result, nextPageToken: data.nextPageToken ?? null, error: null };
+  } catch {
+    return { playlists: [], nextPageToken: null, error: 'Falha de rede ao buscar playlists.' };
+  }
+}
+
+export interface ChannelPlaylistsResult {
+  playlists: YTPlaylist[];
+  nextPageToken: string | null;
+  error: string | null;
+}
+
+interface YouTubePlaylistListItem {
+  id: string;
+  snippet: {
+    title: string;
+    channelTitle: string;
+    thumbnails: {
+      default?: { url: string };
+      medium?: { url: string };
+      high?: { url: string };
+    };
+  };
+  contentDetails: {
+    itemCount: number;
+  };
+}
+
+export async function getChannelPlaylists(
+  channelId: string,
+  pageToken?: string,
+): Promise<ChannelPlaylistsResult> {
+  if (!API_KEY) {
+    return { playlists: [], nextPageToken: null, error: 'Chave da API do YouTube não configurada.' };
+  }
+
+  const cleanId = channelId.replace('yt-channel:', '');
+
+  const params = new URLSearchParams({
+    part: 'snippet,contentDetails',
+    channelId: cleanId,
+    maxResults: '10',
+    key: API_KEY,
+  });
+  if (pageToken) params.set('pageToken', pageToken);
+
+  try {
+    const res = await fetch(`${PLAYLISTS_ENDPOINT}?${params}`);
+    if (!res.ok) {
+      if (res.status === 403) {
+        return { playlists: [], nextPageToken: null, error: 'Cota da API excedida.' };
+      }
+      return { playlists: [], nextPageToken: null, error: `Erro ao buscar playlists do canal (HTTP ${res.status}).` };
+    }
+
+    const data = await res.json();
+    const items: YouTubePlaylistListItem[] = data.items ?? [];
+
+    const result: YTPlaylist[] = items.map((item) => ({
+      id: `yt-playlist:${item.id}`,
+      title: decodeEntities(item.snippet.title),
+      cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+      videoCount: `${item.contentDetails?.itemCount ?? 0} vídeos`,
+      channelName: decodeEntities(item.snippet.channelTitle),
+    }));
+
+    return { playlists: result, nextPageToken: data.nextPageToken ?? null, error: null };
+  } catch {
+    return { playlists: [], nextPageToken: null, error: 'Falha de rede ao buscar playlists do canal.' };
+  }
+}
+
+export interface PlaylistItemsPageResult {
+  songs: Song[];
+  nextPageToken: string | null;
+  error: string | null;
+}
+
+export async function getPlaylistItemsPage(
+  playlistId: string,
+  pageToken?: string,
+): Promise<PlaylistItemsPageResult> {
+  if (!API_KEY) {
+    return { songs: [], nextPageToken: null, error: 'Chave da API do YouTube não configurada.' };
+  }
+
+  const cleanId = playlistId.replace('yt-playlist:', '');
+
+  const params = new URLSearchParams({
+    part: 'snippet',
+    playlistId: cleanId,
+    maxResults: '20',
+    key: API_KEY,
+  });
+  if (pageToken) params.set('pageToken', pageToken);
+
+  try {
+    const res = await fetch(`${PLAYLIST_ITEMS_ENDPOINT}?${params}`);
+    if (!res.ok) {
+      if (res.status === 403) {
+        return { songs: [], nextPageToken: null, error: 'Cota da API excedida.' };
+      }
+      return { songs: [], nextPageToken: null, error: `Erro ao buscar itens da playlist (HTTP ${res.status}).` };
+    }
+
+    const data = await res.json();
+    const items: PlaylistItem[] = data.items ?? [];
+    const nextPageToken: string | null = data.nextPageToken ?? null;
+
+    const songs: Song[] = items
+      .filter((item) => item.snippet?.resourceId?.videoId)
+      .map((item) => ({
+        id: `yt:${item.snippet.resourceId.videoId}`,
+        title: decodeEntities(item.snippet.title),
+        artist: decodeEntities(item.snippet.channelTitle),
+        artistId: `yt-channel:${item.snippet.channelTitle}`,
+        album: 'YouTube',
+        albumId: 'yt',
+        cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        duration: 0,
+        melody: [],
+        bass: [],
+        tempo: 0,
+        waveform: 'sine',
+        youtubeId: item.snippet.resourceId.videoId,
+      }));
+
+    return { songs, nextPageToken, error: null };
+  } catch {
+    return { songs: [], nextPageToken: null, error: 'Falha de rede ao buscar itens da playlist.' };
   }
 }
