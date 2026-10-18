@@ -41,6 +41,8 @@ export function useAuth() {
 
   const signInWithGoogle = useCallback(async () => {
     try {
+      console.log('CLIQUE DE LOGIN GOOGLE RECEBIDO');
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
