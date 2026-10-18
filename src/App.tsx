@@ -76,7 +76,7 @@ function App() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             isLoggedIn={!!profile}
-            onSignINWithGoogle={signInWithGoogle}
+            onSignInWithGoogle={signInWithGoogle}
           />
 
           <YouTubePlayerView
