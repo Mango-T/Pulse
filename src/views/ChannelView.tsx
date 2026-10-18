@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { ArrowLeft, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import type { Song, Channel } from '@/types';
 import { SongRow } from '@/components/SongRow';
-import { getChannelDetails, getChannelVideos } from '@/lib/youtube';
+import { getChannelDetails, getChannelVideosPage } from '@/lib/youtube';
 import { songs as allSongs, artists as allArtists } from '@/data/mockData';
 
 interface ChannelViewProps {
@@ -28,6 +28,10 @@ export function ChannelView({
   const [channelSongs, setChannelSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const uploadsPlaylistRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +39,9 @@ export function ChannelView({
     setError(null);
     setChannel(null);
     setChannelSongs([]);
+    setNextPageToken(null);
+    setLoadMoreError(null);
+    uploadsPlaylistRef.current = null;
 
     // Local artist
     const localArtist = allArtists.find((a) => a.id === channelId);
@@ -52,12 +59,9 @@ export function ChannelView({
       return;
     }
 
-    // YouTube channel
+    // YouTube channel — fetch details (with uploads playlist ID) then first page of videos
     (async () => {
-      const [detailsResult, videosResult] = await Promise.all([
-        getChannelDetails(channelId),
-        getChannelVideos(channelId),
-      ]);
+      const detailsResult = await getChannelDetails(channelId);
       if (cancelled) return;
       if (detailsResult.error) {
         setError(detailsResult.error);
@@ -65,16 +69,47 @@ export function ChannelView({
         return;
       }
       setChannel(detailsResult.channel);
+
+      if (!detailsResult.uploadsPlaylistId) {
+        setLoading(false);
+        return;
+      }
+      uploadsPlaylistRef.current = detailsResult.uploadsPlaylistId;
+
+      const videosResult = await getChannelVideosPage(detailsResult.uploadsPlaylistId);
+      if (cancelled) return;
       if (videosResult.error) {
         setError(videosResult.error);
       } else {
         setChannelSongs(videosResult.songs);
+        setNextPageToken(videosResult.nextPageToken);
       }
       setLoading(false);
     })();
 
     return () => { cancelled = true; };
   }, [channelId]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!nextPageToken || loadingMore) return;
+    const playlistId = uploadsPlaylistRef.current;
+    if (!playlistId) return;
+    setLoadingMore(true);
+    setLoadMoreError(null);
+
+    const result = await getChannelVideosPage(playlistId, nextPageToken);
+    if (result.error) {
+      setLoadMoreError(result.error);
+    } else {
+      setChannelSongs((prev) => {
+        const existingIds = new Set(prev.map((s) => s.id));
+        const newSongs = result.songs.filter((s) => !existingIds.has(s.id));
+        return [...prev, ...newSongs];
+      });
+      setNextPageToken(result.nextPageToken);
+    }
+    setLoadingMore(false);
+  }, [nextPageToken, loadingMore]);
 
   return (
     <div className="px-4 md:px-6 pb-6">
@@ -142,6 +177,27 @@ export function ChannelView({
                   />
                 ))}
               </div>
+
+              {/* Load more */}
+              {nextPageToken && !channel.isLocal && (
+                <div className="flex flex-col items-center gap-2 mt-4">
+                  {loadMoreError && (
+                    <p className="text-red-400/70 text-xs">{loadMoreError}</p>
+                  )}
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white text-sm font-medium rounded-full px-5 py-2.5 transition-colors disabled:opacity-60"
+                  >
+                    {loadingMore ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
+                    Carregar mais
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             !error && (
