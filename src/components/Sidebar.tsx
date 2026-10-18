@@ -1,4 +1,4 @@
-import { Chrome as Home, Search, Library, Heart, LogOut } from 'lucide-react';
+import { House as Home, Search, Library, Heart, LogOut } from 'lucide-react';
 import type { View } from '@/types';
 import type { UserProfile } from '@/types';
 
