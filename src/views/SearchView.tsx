@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Youtube, Loader2, AlertCircle } from 'lucide-react';
-import type { Song } from '@/types';
+import type { Song, Channel } from '@/types';
 import { SongRow } from '@/components/SongRow';
 import { MediaCard } from '@/components/MediaCard';
+import { ChannelAvatar } from '@/components/ChannelAvatar';
 import { songs as allSongs, playlists, artists, albums } from '@/data/mockData';
-import { searchYouTube, isYouTubeConfigured } from '@/lib/youtube';
+import { searchYouTube, searchYouTubeChannels, isYouTubeConfigured } from '@/lib/youtube';
 
 interface SearchViewProps {
   query: string;
@@ -13,6 +14,7 @@ interface SearchViewProps {
   favorites: Set<string>;
   onPlaySong: (song: Song, queue: Song[]) => void;
   onToggleFavorite: (songId: string) => void;
+  onOpenChannel: (channelId: string) => void;
 }
 
 export function SearchView({
@@ -22,6 +24,7 @@ export function SearchView({
   favorites,
   onPlaySong,
   onToggleFavorite,
+  onOpenChannel,
 }: SearchViewProps) {
   const trimmed = query.trim().toLowerCase();
 
@@ -83,6 +86,62 @@ export function SearchView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimmed]);
 
+  // YouTube channel search with debounce
+  const [ytChannels, setYtChannels] = useState<Channel[]>([]);
+  const [ytChannelsLoading, setYtChannelsLoading] = useState(false);
+  const [ytChannelsError, setYtChannelsError] = useState<string | null>(null);
+  const channelQueryIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!trimmed) {
+      setYtChannels([]);
+      setYtChannelsError(null);
+      setYtChannelsLoading(false);
+      return;
+    }
+
+    if (!isYouTubeConfigured()) {
+      setYtChannels([]);
+      return;
+    }
+
+    const id = ++channelQueryIdRef.current;
+    setYtChannelsLoading(true);
+    setYtChannelsError(null);
+
+    const timer = setTimeout(async () => {
+      const result = await searchYouTubeChannels(query.trim());
+      if (id !== channelQueryIdRef.current) return;
+      setYtChannels(result.channels);
+      setYtChannelsError(result.error);
+      setYtChannelsLoading(false);
+    }, 600);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trimmed]);
+
+  // Combined artists & channels — merge local matched artists with YT channels, dedup by name
+  const combinedChannels: Channel[] = useMemo(() => {
+    const localChannels: Channel[] = (results?.matchedArtists ?? []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      avatar: a.photo,
+      description: a.bio,
+      isLocal: true,
+    }));
+
+    const seenNames = new Set(localChannels.map((c) => c.name.toLowerCase()));
+    const filteredYt = ytChannels.filter((c) => {
+      const lower = c.name.toLowerCase();
+      if (seenNames.has(lower)) return false;
+      seenNames.add(lower);
+      return true;
+    });
+
+    return [...localChannels, ...filteredYt];
+  }, [results, ytChannels]);
+
   const browseCategories = [
     { id: 'c1', label: 'Pop', cover: allSongs[0].cover, color: 'from-pink-500 to-rose-700' },
     { id: 'c2', label: 'Eletrônica', cover: allSongs[1].cover, color: 'from-cyan-500 to-blue-700' },
@@ -126,7 +185,11 @@ export function SearchView({
       results.matchedAlbums.length > 0);
 
   const hasYtResults = ytResults.length > 0;
-  const showNoResults = !hasLocalResults && !hasYtResults && !ytLoading && !ytError;
+  const hasChannelResults = combinedChannels.length > 0;
+  const channelsStillLoading = ytChannelsLoading && !hasChannelResults;
+  const showNoResults =
+    !hasLocalResults && !hasYtResults && !hasChannelResults &&
+    !ytLoading && !ytError && !channelsStillLoading;
 
   if (showNoResults) {
     return (
@@ -142,27 +205,32 @@ export function SearchView({
 
   return (
     <div className="px-4 md:px-6 pb-6 space-y-8">
-      {results && results.matchedArtists.length > 0 && (
+      {/* Artistas e canais — horizontal scroll */}
+      {(hasChannelResults || channelsStillLoading) && (
         <section>
-          <h2 className="text-white text-lg font-bold mb-4">Artistas</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-            {results.matchedArtists.map((artist) => (
-              <MediaCard
-                key={artist.id}
-                data={{
-                  id: artist.id,
-                  title: artist.name,
-                  subtitle: 'Artista',
-                  cover: artist.photo,
-                  rounded: true,
-                }}
-                onPlay={() => {
-                  const artistSongs = allSongs.filter((s) => s.artistId === artist.id);
-                  if (artistSongs.length > 0) onPlaySong(artistSongs[0], artistSongs);
-                }}
-              />
-            ))}
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-white text-lg font-bold">Artistas e canais</h2>
+            {channelsStillLoading && (
+              <Loader2 size={16} className="text-neutral-400 animate-spin" />
+            )}
           </div>
+          {ytChannelsError && (
+            <div className="flex items-start gap-3 bg-red-950/30 border border-red-900/40 rounded-lg p-3 mb-3">
+              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <p className="text-red-400/70 text-xs">{ytChannelsError}</p>
+            </div>
+          )}
+          {hasChannelResults && (
+            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+              {combinedChannels.map((ch) => (
+                <ChannelAvatar
+                  key={ch.id}
+                  channel={ch}
+                  onClick={() => onOpenChannel(ch.id)}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
 

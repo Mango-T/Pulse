@@ -16,6 +16,7 @@ const viewTitles: Record<View, string> = {
   home: 'Boa tarde',
   search: 'Buscar',
   library: 'Minha Biblioteca',
+  channel: 'Canal',
 };
 
 export function TopBar({

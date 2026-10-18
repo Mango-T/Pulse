@@ -14,6 +14,7 @@ import { HomeView } from '@/views/HomeView';
 import { SearchView } from '@/views/SearchView';
 import { LibraryView } from '@/views/LibraryView';
 import { AuthView } from '@/views/AuthView';
+import { ChannelView } from '@/views/ChannelView';
 
 function userToProfile(u: User): UserProfile {
   return {
@@ -28,6 +29,7 @@ function App() {
   const [view, setView] = useState<View>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [playerMode, setPlayerMode] = useState<PlayerMode>('video');
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
 
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const player = usePlayer();
@@ -109,6 +111,22 @@ function App() {
               favorites={favorites}
               onPlaySong={handlePlaySong}
               onToggleFavorite={toggleFavorite}
+              onOpenChannel={(channelId) => {
+                setSelectedChannelId(channelId);
+                setView('channel');
+              }}
+            />
+          )}
+
+          {view === 'channel' && selectedChannelId && (
+            <ChannelView
+              channelId={selectedChannelId}
+              currentSongId={player.currentSong?.id ?? null}
+              isPlaying={player.isPlaying}
+              favorites={favorites}
+              onPlaySong={handlePlaySong}
+              onToggleFavorite={toggleFavorite}
+              onBack={() => setView('search')}
             />
           )}
 

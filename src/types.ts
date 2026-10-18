@@ -1,4 +1,4 @@
-export type View = 'home' | 'search' | 'library';
+export type View = 'home' | 'search' | 'library' | 'channel';
 
 export interface UserProfile {
   id: string;
@@ -49,4 +49,12 @@ export interface Playlist {
   description: string;
   cover: string;
   songIds: string[];
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  avatar: string;
+  description: string;
+  isLocal: boolean;
 }
