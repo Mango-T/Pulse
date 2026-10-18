@@ -58,12 +58,6 @@ function App() {
     );
   }
 
-  if (!profile) {
-    return (
-      <AuthView onSignInWithGoogle={signInWithGoogle} loading={authLoading} />
-    );
-  }
-
   return (
     <div className="h-screen w-screen flex flex-col bg-black overflow-hidden text-white select-none">
       <div className="flex flex-1 overflow-hidden">
