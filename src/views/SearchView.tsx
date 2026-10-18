@@ -13,7 +13,6 @@ const filterTabs: { id: SearchFilter; label: string }[] = [
   { id: 'all', label: 'Tudo' },
   { id: 'videos', label: 'Vídeos' },
   { id: 'channels', label: 'Canais e artistas' },
-  { id: 'playlists', label: 'Playlists' },
 ];
 
 interface SearchViewProps {
@@ -143,14 +142,13 @@ export function SearchView({
   const ytPlaylistsSearchDoneRef = useRef(false);
 
   useEffect(() => {
-    if (!trimmed) {
-      setYtPlaylists([]);
-      setYtPlaylistsError(null);
-      setYtPlaylistsLoading(false);
-      setYtPlaylistsNextPage(null);
-      ytPlaylistsSearchDoneRef.current = false;
-      return;
-    }
+    setYtPlaylists([]);
+    setYtPlaylistsError(null);
+    setYtPlaylistsLoading(false);
+    setYtPlaylistsNextPage(null);
+    ytPlaylistsSearchDoneRef.current = false;
+    playlistQueryIdRef.current += 1;
+  }, [trimmed]);
 
     if (!isYouTubeConfigured()) {
       setYtPlaylists([]);
@@ -283,8 +281,8 @@ export function SearchView({
   }
 
   const showChannels = activeFilter === 'all' || activeFilter === 'channels';
-  const showVideos = activeFilter === 'all' || activeFilter === 'videos';
-  const showPlaylists = activeFilter === 'all' || activeFilter === 'playlists';
+const showVideos = activeFilter === 'all' || activeFilter === 'videos';
+const showPlaylists = false; // Temporarily disabled in global search.
 
   return (
     <div className="px-4 md:px-6 pb-6 space-y-8">
