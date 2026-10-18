@@ -258,6 +258,9 @@ export function SearchView({
       results.matchedArtists.length > 0 ||
       results.matchedAlbums.length > 0);
 
+  const hasYtResults = ytResults.length > 0;
+  const hasChannelResults = combinedChannels.length > 0;
+  const channelsStillLoading = ytChannelsLoading;
   const hasYtPlaylists = ytPlaylists.length > 0;
   const ytPlaylistsStillLoading = ytPlaylistsLoading && !hasYtPlaylists;
   const hasLocalPlaylists = !!(results && results.matchedPlaylists.length > 0);

@@ -1,4 +1,4 @@
-import type { Song, Channel } from '@/types';
+import type { Song, Channel, YTPlaylist } from '@/types';
 
 const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
 const SEARCH_ENDPOINT = 'https://www.googleapis.com/youtube/v3/search';

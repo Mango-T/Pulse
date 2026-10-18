@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Home as HomeIcon, Search as SearchIcon, Library, Loader2 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import type { View, Song, PlayerMode, UserProfile } from '@/types';
+import type { View, Song, PlayerMode, UserProfile, YTPlaylist } from '@/types';
 import { songs, playlists, artists, albums, getSongsByIds } from '@/data/mockData';
 import { usePlayer } from '@/hooks/usePlayer';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -15,6 +15,7 @@ import { SearchView } from '@/views/SearchView';
 import { LibraryView } from '@/views/LibraryView';
 import { AuthView } from '@/views/AuthView';
 import { ChannelView } from '@/views/ChannelView';
+import { PlaylistView } from '@/views/PlaylistView';
 
 function userToProfile(u: User): UserProfile {
   return {
@@ -30,6 +31,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [playerMode, setPlayerMode] = useState<PlayerMode>('video');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<YTPlaylist | null>(null);
 
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const player = usePlayer();
@@ -115,6 +117,10 @@ function App() {
                 setSelectedChannelId(channelId);
                 setView('channel');
               }}
+              onOpenPlaylist={(playlist) => {
+                setSelectedPlaylist(playlist);
+                setView('playlist');
+              }}
             />
           )}
 
@@ -126,7 +132,25 @@ function App() {
               favorites={favorites}
               onPlaySong={handlePlaySong}
               onToggleFavorite={toggleFavorite}
+              onOpenPlaylist={(playlist) => {
+                setSelectedPlaylist(playlist);
+                setView('playlist');
+              }}
               onBack={() => setView('search')}
+            />
+          )}
+
+          {view === 'playlist' && selectedPlaylist && (
+            <PlaylistView
+              playlistId={selectedPlaylist.id}
+              playlistTitle={selectedPlaylist.title}
+              playlistCover={selectedPlaylist.cover}
+              currentSongId={player.currentSong?.id ?? null}
+              isPlaying={player.isPlaying}
+              favorites={favorites}
+              onPlaySong={handlePlaySong}
+              onToggleFavorite={toggleFavorite}
+              onBack={() => setView(selectedChannelId ? 'channel' : 'search')}
             />
           )}
 
