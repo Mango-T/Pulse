@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Home as HomeIcon, Search as SearchIcon, Library, Loader2 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import type { View, Song, PlayerMode, UserProfile, YTPlaylist } from '@/types';
-import { songs, playlists, artists, albums, getSongsByIds } from '@/data/mockData';
+import type { View, Song, PlayerMode, UserProfile, YTPlaylist, UserPlaylist } from '@/types';
+import { songs, playlists, artists, albums } from '@/data/mockData';
 import { usePlayer } from '@/hooks/usePlayer';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlaylists } from '@/hooks/usePlaylists';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
 import { PlayerBar } from '@/components/PlayerBar';
@@ -16,6 +17,7 @@ import { LibraryView } from '@/views/LibraryView';
 import { AuthView } from '@/views/AuthView';
 import { ChannelView } from '@/views/ChannelView';
 import { PlaylistView } from '@/views/PlaylistView';
+import { UserPlaylistView } from '@/views/UserPlaylistView';
 
 function userToProfile(u: User): UserProfile {
   return {
@@ -26,22 +28,37 @@ function userToProfile(u: User): UserProfile {
   };
 }
 
-function App() {
+export function App() {
   const [view, setView] = useState<View>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [playerMode, setPlayerMode] = useState<PlayerMode>('video');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<YTPlaylist | null>(null);
+  const [selectedUserPlaylistId, setSelectedUserPlaylistId] = useState<string | null>(null);
 
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const player = usePlayer();
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { favorites, favoriteIds, favoriteSongs, toggleFavorite, isFavorite } = useFavorites();
+  const {
+    playlists: userPlaylists,
+    createPlaylist,
+    renamePlaylist,
+    deletePlaylist,
+    addSongToPlaylist,
+    removeSongFromPlaylist,
+    getPlaylistById,
+  } = usePlaylists(user?.id ?? null);
 
   const profile: UserProfile | null = user ? userToProfile(user) : null;
 
-  const favoriteSongs = useMemo(
-    () => getSongsByIds([...favorites]),
-    [favorites],
+  const favoritesPlaylist: UserPlaylist = useMemo(
+    () => ({
+      id: 'favorites',
+      title: 'Favoritos',
+      songs: favoriteSongs,
+      createdAt: 0,
+    }),
+    [favoriteSongs],
   );
 
   const handlePlaySong = (song: Song, queue?: Song[]) => {
@@ -53,6 +70,12 @@ function App() {
       player.playSong(playlistSongs[0], playlistSongs);
     }
   };
+
+  const selectedUserPlaylist = selectedUserPlaylistId
+    ? selectedUserPlaylistId === 'favorites'
+      ? favoritesPlaylist
+      : getPlaylistById(selectedUserPlaylistId)
+    : null;
 
   if (authLoading) {
     return (
@@ -68,7 +91,7 @@ function App() {
         <Sidebar
           currentView={view}
           onNavigate={setView}
-          favoriteCount={favorites.size}
+          favoriteCount={favoriteIds.size}
           user={profile}
           onSignOut={signOut}
         />
@@ -98,7 +121,7 @@ function App() {
               albums={albums}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
-              favorites={favorites}
+              favorites={favoriteIds}
               onPlaySong={handlePlaySong}
               onPlayPlaylist={handlePlayPlaylist}
               onToggleFavorite={toggleFavorite}
@@ -110,7 +133,7 @@ function App() {
               query={searchQuery}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
-              favorites={favorites}
+              favorites={favoriteIds}
               onPlaySong={handlePlaySong}
               onToggleFavorite={toggleFavorite}
               onOpenChannel={(channelId) => {
@@ -129,7 +152,7 @@ function App() {
               channelId={selectedChannelId}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
-              favorites={favorites}
+              favorites={favoriteIds}
               onPlaySong={handlePlaySong}
               onToggleFavorite={toggleFavorite}
               onOpenPlaylist={(playlist) => {
@@ -147,7 +170,7 @@ function App() {
               playlistCover={selectedPlaylist.cover}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
-              favorites={favorites}
+              favorites={favoriteIds}
               onPlaySong={handlePlaySong}
               onToggleFavorite={toggleFavorite}
               onBack={() => setView(selectedChannelId ? 'channel' : 'search')}
@@ -157,10 +180,47 @@ function App() {
           {view === 'library' && (
             <LibraryView
               favoriteSongs={favoriteSongs}
+              playlists={userPlaylists}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
+              onPlayPlaylist={handlePlayPlaylist}
+              onOpenPlaylist={(playlistId) => {
+                setSelectedUserPlaylistId(playlistId);
+                setView('my-playlist');
+              }}
+              onCreatePlaylist={(title) => {
+                createPlaylist(title);
+              }}
+            />
+          )}
+
+          {view === 'my-playlist' && selectedUserPlaylist && (
+            <UserPlaylistView
+              playlist={selectedUserPlaylist}
+              isFavorites={selectedUserPlaylistId === 'favorites'}
+              currentSongId={player.currentSong?.id ?? null}
+              isPlaying={player.isPlaying}
+              favoriteIds={favoriteIds}
               onPlaySong={handlePlaySong}
+              onPlayAll={handlePlayPlaylist}
               onToggleFavorite={toggleFavorite}
+              onAddSong={(song) => {
+                if (selectedUserPlaylistId) addSongToPlaylist(selectedUserPlaylistId, song);
+              }}
+              onRemoveSong={(songId) => {
+                if (selectedUserPlaylistId) removeSongFromPlaylist(selectedUserPlaylistId, songId);
+              }}
+              onRename={(newTitle) => {
+                if (selectedUserPlaylistId) renamePlaylist(selectedUserPlaylistId, newTitle);
+              }}
+              onDelete={() => {
+                if (selectedUserPlaylistId) {
+                  deletePlaylist(selectedUserPlaylistId);
+                  setSelectedUserPlaylistId(null);
+                  setView('library');
+                }
+              }}
+              onBack={() => setView('library')}
             />
           )}
         </main>
@@ -183,7 +243,7 @@ function App() {
         onToggleShuffle={player.toggleShuffle}
         onCycleRepeat={player.cycleRepeat}
         onToggleFavorite={() => {
-          if (player.currentSong) toggleFavorite(player.currentSong.id);
+          if (player.currentSong) toggleFavorite(player.currentSong);
         }}
       />
 

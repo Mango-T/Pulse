@@ -1,37 +1,73 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { Song } from '@/types';
+import { songs as allSongs, getSongById } from '@/data/mockData';
 
 const STORAGE_KEY = 'pulse:favorites';
 
+interface StoredFavorite {
+  song: Song;
+  addedAt: number;
+}
+
+function loadStored(): StoredFavorite[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      if (typeof parsed[0] === 'string') {
+        const ids = parsed as string[];
+        return ids
+          .map((id) => {
+            const song = getSongById(id);
+            return song ? { song, addedAt: 0 } : null;
+          })
+          .filter((x): x is StoredFavorite => x !== null);
+      }
+      if (typeof parsed[0] === 'object' && 'song' in parsed[0]) {
+        return parsed as StoredFavorite[];
+      }
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStored(items: StoredFavorite[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 export function useFavorites() {
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [items, setItems] = useState<StoredFavorite[]>([]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setFavorites(new Set(JSON.parse(stored)));
-      }
-    } catch {
-      // ignore
-    }
+    setItems(loadStored());
   }, []);
 
-  const save = useCallback((ids: Set<string>) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
-    } catch {
-      // ignore
-    }
+  const save = useCallback((next: StoredFavorite[]) => {
+    saveStored(next);
   }, []);
+
+  const favorites = items;
+  const favoriteIds = new Set(items.map((f) => f.song.id));
+
+  const favoriteSongs: Song[] = items.map((f) => f.song);
 
   const toggleFavorite = useCallback(
-    (songId: string) => {
-      setFavorites((prev) => {
-        const next = new Set(prev);
-        if (next.has(songId)) {
-          next.delete(songId);
+    (song: Song) => {
+      setItems((prev) => {
+        const idx = prev.findIndex((f) => f.song.id === song.id);
+        let next: StoredFavorite[];
+        if (idx >= 0) {
+          next = prev.filter((_, i) => i !== idx);
         } else {
-          next.add(songId);
+          next = [...prev, { song, addedAt: Date.now() }];
         }
         save(next);
         return next;
@@ -40,7 +76,10 @@ export function useFavorites() {
     [save],
   );
 
-  const isFavorite = useCallback((songId: string) => favorites.has(songId), [favorites]);
+  const isFavorite = useCallback(
+    (songId: string) => favoriteIds.has(songId),
+    [favoriteIds],
+  );
 
-  return { favorites, toggleFavorite, isFavorite };
+  return { favorites, favoriteIds, favoriteSongs, toggleFavorite, isFavorite };
 }

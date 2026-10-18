@@ -13,7 +13,7 @@ interface HomeViewProps {
   favorites: Set<string>;
   onPlaySong: (song: Song, queue: Song[]) => void;
   onPlayPlaylist: (songs: Song[]) => void;
-  onToggleFavorite: (songId: string) => void;
+  onToggleFavorite: (song: Song) => void;
 }
 
 export function HomeView({
@@ -73,7 +73,7 @@ export function HomeView({
                 isPlaying={isPlaying && currentSongId === song.id}
                 isFavorite={favorites.has(song.id)}
                 onPlay={() => onPlaySong(song, popularSongs)}
-                onToggleFavorite={() => onToggleFavorite(song.id)}
+                onToggleFavorite={() => onToggleFavorite(song)}
               />
             ))}
           </div>

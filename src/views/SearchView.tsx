@@ -21,7 +21,7 @@ interface SearchViewProps {
   isPlaying: boolean;
   favorites: Set<string>;
   onPlaySong: (song: Song, queue: Song[]) => void;
-  onToggleFavorite: (songId: string) => void;
+  onToggleFavorite: (song: Song) => void;
   onOpenChannel: (channelId: string) => void;
   onOpenPlaylist: (playlist: YTPlaylist) => void;
 }
@@ -322,7 +322,7 @@ const showPlaylists = false; // Temporarily disabled in global search.
                   isPlaying={isPlaying && currentSongId === song.id}
                   isFavorite={favorites.has(song.id)}
                   onPlay={() => onPlaySong(song, results.matchedSongs)}
-                  onToggleFavorite={() => onToggleFavorite(song.id)}
+                  onToggleFavorite={() => onToggleFavorite(song)}
                 />
               ))}
             </div>
@@ -497,7 +497,7 @@ const showPlaylists = false; // Temporarily disabled in global search.
                     isPlaying={isPlaying && currentSongId === song.id}
                     isFavorite={favorites.has(song.id)}
                     onPlay={() => onPlaySong(song, ytResults)}
-                    onToggleFavorite={() => onToggleFavorite(song.id)}
+                    onToggleFavorite={() => onToggleFavorite(song)}
                   />
                 ))}
               </div>

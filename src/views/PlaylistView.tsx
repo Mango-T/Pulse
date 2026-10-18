@@ -12,7 +12,7 @@ interface PlaylistViewProps {
   isPlaying: boolean;
   favorites: Set<string>;
   onPlaySong: (song: Song, queue: Song[]) => void;
-  onToggleFavorite: (songId: string) => void;
+  onToggleFavorite: (song: Song) => void;
   onBack: () => void;
 }
 
@@ -135,7 +135,7 @@ export function PlaylistView({
                     isPlaying={isPlaying && currentSongId === song.id}
                     isFavorite={favorites.has(song.id)}
                     onPlay={() => onPlaySong(song, songs)}
-                    onToggleFavorite={() => onToggleFavorite(song.id)}
+                    onToggleFavorite={() => onToggleFavorite(song)}
                   />
                 ))}
               </div>

@@ -18,6 +18,7 @@ const viewTitles: Record<View, string> = {
   library: 'Minha Biblioteca',
   channel: 'Canal',
   playlist: 'Playlist',
+  'my-playlist': 'Playlist',
 };
 
 export function TopBar({

@@ -1,4 +1,4 @@
-export type View = 'home' | 'search' | 'library' | 'channel' | 'playlist';
+export type View = 'home' | 'search' | 'library' | 'channel' | 'playlist' | 'my-playlist';
 
 export interface UserProfile {
   id: string;
@@ -65,4 +65,11 @@ export interface YTPlaylist {
   cover: string;
   videoCount: string;
   channelName: string;
+}
+
+export interface UserPlaylist {
+  id: string;
+  title: string;
+  songs: Song[];
+  createdAt: number;
 }

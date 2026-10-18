@@ -13,7 +13,7 @@ interface ChannelViewProps {
   isPlaying: boolean;
   favorites: Set<string>;
   onPlaySong: (song: Song, queue: Song[]) => void;
-  onToggleFavorite: (songId: string) => void;
+  onToggleFavorite: (song: Song) => void;
   onOpenPlaylist: (playlist: YTPlaylist) => void;
   onBack: () => void;
 }
@@ -270,7 +270,7 @@ export function ChannelView({
                       isPlaying={isPlaying && currentSongId === song.id}
                       isFavorite={favorites.has(song.id)}
                       onPlay={() => onPlaySong(song, channelSongs)}
-                      onToggleFavorite={() => onToggleFavorite(song.id)}
+                      onToggleFavorite={() => onToggleFavorite(song)}
                     />
                   ))}
                 </div>

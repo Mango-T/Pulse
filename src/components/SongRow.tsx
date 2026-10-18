@@ -9,7 +9,7 @@ interface SongRowProps {
   isCurrent: boolean;
   isFavorite: boolean;
   onPlay: () => void;
-  onToggleFavorite: () => void;
+  onToggleFavorite: (song: Song) => void;
 }
 
 export function SongRow({
@@ -62,7 +62,7 @@ export function SongRow({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onToggleFavorite();
+          onToggleFavorite(song);
         }}
         className="shrink-0 transition-all duration-200"
       >
