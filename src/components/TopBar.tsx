@@ -20,10 +20,13 @@ const getGreeting = () => {
   return 'Boa Noite';
 };
 
-const viewTitles = {
+const viewTitles: Record<View, string> = {
   home: getGreeting(),
   search: 'Buscar',
   library: 'Minha Biblioteca',
+  channel: 'Canal',
+  playlist: 'Playlist',
+  'my-playlist': 'Minha Playlist',
 };
 export function TopBar({
   view,
