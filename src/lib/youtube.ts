@@ -1,3 +1,4 @@
+
 import type { Song, Channel, YTPlaylist } from '@/types';
 
 const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
@@ -5,6 +6,7 @@ const SEARCH_ENDPOINT = 'https://www.googleapis.com/youtube/v3/search';
 const CHANNELS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/channels';
 const PLAYLIST_ITEMS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/playlistItems';
 const PLAYLISTS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/playlists';
+const VIDEOS_ENDPOINT = 'https://www.googleapis.com/youtube/v3/videos';
 
 interface YouTubeSearchItem {
   id: { videoId: string };
@@ -28,9 +30,69 @@ export function isYouTubeConfigured(): boolean {
   return !!API_KEY;
 }
 
+/** Converte durações ISO 8601 do YouTube para segundos. */
+function parseYouTubeDuration(duration: string): number {
+  const match = duration.match(
+    /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/,
+  );
+
+  if (!match) return 0;
+
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+/** Busca as durações reais de vários vídeos em uma única requisição. */
+async function addVideoDurations(songs: Song[]): Promise<Song[]> {
+  if (!API_KEY || songs.length === 0) return songs;
+
+  const ids = [...new Set(
+    songs.map((song) => song.youtubeId).filter(Boolean),
+  )];
+
+  if (ids.length === 0) return songs;
+
+  try {
+    const params = new URLSearchParams({
+      part: 'contentDetails',
+      id: ids.join(','),
+      key: API_KEY,
+    });
+
+    const response = await fetch(`${VIDEOS_ENDPOINT}?${params}`);
+
+    if (!response.ok) return songs;
+
+    const data = await response.json();
+
+    const durations = new Map<string, number>(
+      (data.items ?? []).map(
+        (item: { id: string; contentDetails?: { duration?: string } }) => [
+          item.id,
+          parseYouTubeDuration(item.contentDetails?.duration ?? ''),
+        ],
+      ),
+    );
+
+    return songs.map((song) => ({
+      ...song,
+      duration: durations.get(song.youtubeId) ?? song.duration,
+    }));
+  } catch {
+    // Uma falha ao consultar durações não deve impedir a exibição dos vídeos.
+    return songs;
+  }
+}
+
 export async function searchYouTube(query: string): Promise<YouTubeSearchResult> {
   if (!API_KEY) {
-    return { songs: [], error: 'Chave da API do YouTube não configurada. Adicione VITE_YOUTUBE_API_KEY no arquivo .env' };
+    return {
+      songs: [],
+      error: 'Chave da API do YouTube não configurada. Adicione VITE_YOUTUBE_API_KEY no arquivo .env',
+    };
   }
 
   const trimmed = query.trim();
@@ -46,11 +108,19 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchResult>
 
   try {
     const res = await fetch(`${SEARCH_ENDPOINT}?${params}`);
+
     if (!res.ok) {
       if (res.status === 403) {
-        return { songs: [], error: 'A chave da API do YouTube não tem permissão ou a cota diária foi excedida.' };
+        return {
+          songs: [],
+          error: 'A chave da API do YouTube não tem permissão ou a cota diária foi excedida.',
+        };
       }
-      return { songs: [], error: `Erro na busca do YouTube (HTTP ${res.status}).` };
+
+      return {
+        songs: [],
+        error: `Erro na busca do YouTube (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
@@ -60,12 +130,18 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchResult>
       .filter((item) => item.id?.videoId)
       .map((item) => ({
         id: `yt:${item.id.videoId}`,
-        title: item.snippet.title.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"'),
+        title: item.snippet.title
+          .replace(/&amp;/g, '&')
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"'),
         artist: item.snippet.channelTitle,
         artistId: `yt-channel:${item.snippet.channelTitle}`,
         album: 'YouTube',
         albumId: 'yt',
-        cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        cover:
+          item.snippet.thumbnails.medium?.url ??
+          item.snippet.thumbnails.default?.url ??
+          '',
         duration: 0,
         melody: [],
         bass: [],
@@ -74,9 +150,15 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchResult>
         youtubeId: item.id.videoId,
       }));
 
-    return { songs, error: null };
+    return {
+      songs: await addVideoDurations(songs),
+      error: null,
+    };
   } catch {
-    return { songs: [], error: 'Falha de rede ao buscar no YouTube. Verifique sua conexão.' };
+    return {
+      songs: [],
+      error: 'Falha de rede ao buscar no YouTube. Verifique sua conexão.',
+    };
   }
 }
 
@@ -107,7 +189,9 @@ function decodeEntities(text: string): string {
     .replace(/&gt;/g, '>');
 }
 
-export async function searchYouTubeChannels(query: string): Promise<YouTubeChannelResult> {
+export async function searchYouTubeChannels(
+  query: string,
+): Promise<YouTubeChannelResult> {
   if (!API_KEY) {
     return { channels: [], error: null };
   }
@@ -125,11 +209,19 @@ export async function searchYouTubeChannels(query: string): Promise<YouTubeChann
 
   try {
     const res = await fetch(`${SEARCH_ENDPOINT}?${params}`);
+
     if (!res.ok) {
       if (res.status === 403) {
-        return { channels: [], error: 'A chave da API do YouTube não tem permissão ou a cota diária foi excedida.' };
+        return {
+          channels: [],
+          error: 'A chave da API do YouTube não tem permissão ou a cota diária foi excedida.',
+        };
       }
-      return { channels: [], error: `Erro na busca de canais (HTTP ${res.status}).` };
+
+      return {
+        channels: [],
+        error: `Erro na busca de canais (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
@@ -140,14 +232,20 @@ export async function searchYouTubeChannels(query: string): Promise<YouTubeChann
       .map((item) => ({
         id: `yt-channel:${item.id.channelId}`,
         name: decodeEntities(item.snippet.title),
-        avatar: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        avatar:
+          item.snippet.thumbnails.medium?.url ??
+          item.snippet.thumbnails.default?.url ??
+          '',
         description: decodeEntities(item.snippet.description || ''),
         isLocal: false,
       }));
 
     return { channels, error: null };
   } catch {
-    return { channels: [], error: 'Falha de rede ao buscar canais. Verifique sua conexão.' };
+    return {
+      channels: [],
+      error: 'Falha de rede ao buscar canais. Verifique sua conexão.',
+    };
   }
 }
 
@@ -175,7 +273,11 @@ export async function getChannelVideosPage(
   pageToken?: string,
 ): Promise<ChannelVideosPageResult> {
   if (!API_KEY) {
-    return { songs: [], nextPageToken: null, error: 'Chave da API do YouTube não configurada.' };
+    return {
+      songs: [],
+      nextPageToken: null,
+      error: 'Chave da API do YouTube não configurada.',
+    };
   }
 
   const params = new URLSearchParams({
@@ -184,15 +286,26 @@ export async function getChannelVideosPage(
     maxResults: '20',
     key: API_KEY,
   });
+
   if (pageToken) params.set('pageToken', pageToken);
 
   try {
     const res = await fetch(`${PLAYLIST_ITEMS_ENDPOINT}?${params}`);
+
     if (!res.ok) {
       if (res.status === 403) {
-        return { songs: [], nextPageToken: null, error: 'Cota da API excedida.' };
+        return {
+          songs: [],
+          nextPageToken: null,
+          error: 'Cota da API excedida.',
+        };
       }
-      return { songs: [], nextPageToken: null, error: `Erro ao buscar vídeos (HTTP ${res.status}).` };
+
+      return {
+        songs: [],
+        nextPageToken: null,
+        error: `Erro ao buscar vídeos (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
@@ -208,7 +321,10 @@ export async function getChannelVideosPage(
         artistId: `yt-channel:${item.snippet.channelTitle}`,
         album: 'YouTube',
         albumId: 'yt',
-        cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        cover:
+          item.snippet.thumbnails.medium?.url ??
+          item.snippet.thumbnails.default?.url ??
+          '',
         duration: 0,
         melody: [],
         bass: [],
@@ -217,15 +333,33 @@ export async function getChannelVideosPage(
         youtubeId: item.snippet.resourceId.videoId,
       }));
 
-    return { songs, nextPageToken, error: null };
+    return {
+      songs: await addVideoDurations(songs),
+      nextPageToken,
+      error: null,
+    };
   } catch {
-    return { songs: [], nextPageToken: null, error: 'Falha de rede ao buscar vídeos do canal.' };
+    return {
+      songs: [],
+      nextPageToken: null,
+      error: 'Falha de rede ao buscar vídeos do canal.',
+    };
   }
 }
 
-export async function getChannelDetails(channelId: string): Promise<{ channel: Channel | null; uploadsPlaylistId: string | null; error: string | null }> {
+export async function getChannelDetails(
+  channelId: string,
+): Promise<{
+  channel: Channel | null;
+  uploadsPlaylistId: string | null;
+  error: string | null;
+}> {
   if (!API_KEY) {
-    return { channel: null, uploadsPlaylistId: null, error: 'Chave da API do YouTube não configurada.' };
+    return {
+      channel: null,
+      uploadsPlaylistId: null,
+      error: 'Chave da API do YouTube não configurada.',
+    };
   }
 
   const cleanId = channelId.replace('yt-channel:', '');
@@ -238,27 +372,47 @@ export async function getChannelDetails(channelId: string): Promise<{ channel: C
 
   try {
     const res = await fetch(`${CHANNELS_ENDPOINT}?${params}`);
+
     if (!res.ok) {
-      return { channel: null, uploadsPlaylistId: null, error: `Erro ao buscar detalhes do canal (HTTP ${res.status}).` };
+      return {
+        channel: null,
+        uploadsPlaylistId: null,
+        error: `Erro ao buscar detalhes do canal (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
     const item = data.items?.[0];
-    if (!item) return { channel: null, uploadsPlaylistId: null, error: 'Canal não encontrado.' };
+
+    if (!item) {
+      return {
+        channel: null,
+        uploadsPlaylistId: null,
+        error: 'Canal não encontrado.',
+      };
+    }
 
     return {
       channel: {
         id: `yt-channel:${item.id}`,
         name: decodeEntities(item.snippet?.title ?? ''),
-        avatar: item.snippet?.thumbnails?.medium?.url ?? item.snippet?.thumbnails?.default?.url ?? '',
+        avatar:
+          item.snippet?.thumbnails?.medium?.url ??
+          item.snippet?.thumbnails?.default?.url ??
+          '',
         description: decodeEntities(item.snippet?.description ?? ''),
         isLocal: false,
       },
-      uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads ?? null,
+      uploadsPlaylistId:
+        item.contentDetails?.relatedPlaylists?.uploads ?? null,
       error: null,
     };
   } catch {
-    return { channel: null, uploadsPlaylistId: null, error: 'Falha de rede ao buscar detalhes do canal.' };
+    return {
+      channel: null,
+      uploadsPlaylistId: null,
+      error: 'Falha de rede ao buscar detalhes do canal.',
+    };
   }
 }
 
@@ -292,7 +446,9 @@ export async function searchYouTubePlaylists(
   }
 
   const trimmed = query.trim();
-  if (!trimmed) return { playlists: [], nextPageToken: null, error: null };
+  if (!trimmed) {
+    return { playlists: [], nextPageToken: null, error: null };
+  }
 
   const params = new URLSearchParams({
     part: 'snippet',
@@ -301,15 +457,26 @@ export async function searchYouTubePlaylists(
     q: trimmed,
     key: API_KEY,
   });
+
   if (pageToken) params.set('pageToken', pageToken);
 
   try {
     const res = await fetch(`${SEARCH_ENDPOINT}?${params}`);
+
     if (!res.ok) {
       if (res.status === 403) {
-        return { playlists: [], nextPageToken: null, error: 'Cota da API excedida.' };
+        return {
+          playlists: [],
+          nextPageToken: null,
+          error: 'Cota da API excedida.',
+        };
       }
-      return { playlists: [], nextPageToken: null, error: `Erro ao buscar playlists (HTTP ${res.status}).` };
+
+      return {
+        playlists: [],
+        nextPageToken: null,
+        error: `Erro ao buscar playlists (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
@@ -320,14 +487,25 @@ export async function searchYouTubePlaylists(
       .map((item) => ({
         id: `yt-playlist:${item.id.playlistId}`,
         title: decodeEntities(item.snippet.title),
-        cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        cover:
+          item.snippet.thumbnails.medium?.url ??
+          item.snippet.thumbnails.default?.url ??
+          '',
         videoCount: '',
         channelName: decodeEntities(item.snippet.channelTitle),
       }));
 
-    return { playlists: result, nextPageToken: data.nextPageToken ?? null, error: null };
+    return {
+      playlists: result,
+      nextPageToken: data.nextPageToken ?? null,
+      error: null,
+    };
   } catch {
-    return { playlists: [], nextPageToken: null, error: 'Falha de rede ao buscar playlists.' };
+    return {
+      playlists: [],
+      nextPageToken: null,
+      error: 'Falha de rede ao buscar playlists.',
+    };
   }
 }
 
@@ -358,7 +536,11 @@ export async function getChannelPlaylists(
   pageToken?: string,
 ): Promise<ChannelPlaylistsResult> {
   if (!API_KEY) {
-    return { playlists: [], nextPageToken: null, error: 'Chave da API do YouTube não configurada.' };
+    return {
+      playlists: [],
+      nextPageToken: null,
+      error: 'Chave da API do YouTube não configurada.',
+    };
   }
 
   const cleanId = channelId.replace('yt-channel:', '');
@@ -369,15 +551,26 @@ export async function getChannelPlaylists(
     maxResults: '10',
     key: API_KEY,
   });
+
   if (pageToken) params.set('pageToken', pageToken);
 
   try {
     const res = await fetch(`${PLAYLISTS_ENDPOINT}?${params}`);
+
     if (!res.ok) {
       if (res.status === 403) {
-        return { playlists: [], nextPageToken: null, error: 'Cota da API excedida.' };
+        return {
+          playlists: [],
+          nextPageToken: null,
+          error: 'Cota da API excedida.',
+        };
       }
-      return { playlists: [], nextPageToken: null, error: `Erro ao buscar playlists do canal (HTTP ${res.status}).` };
+
+      return {
+        playlists: [],
+        nextPageToken: null,
+        error: `Erro ao buscar playlists do canal (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
@@ -386,14 +579,25 @@ export async function getChannelPlaylists(
     const result: YTPlaylist[] = items.map((item) => ({
       id: `yt-playlist:${item.id}`,
       title: decodeEntities(item.snippet.title),
-      cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+      cover:
+        item.snippet.thumbnails.medium?.url ??
+        item.snippet.thumbnails.default?.url ??
+        '',
       videoCount: `${item.contentDetails?.itemCount ?? 0} vídeos`,
       channelName: decodeEntities(item.snippet.channelTitle),
     }));
 
-    return { playlists: result, nextPageToken: data.nextPageToken ?? null, error: null };
+    return {
+      playlists: result,
+      nextPageToken: data.nextPageToken ?? null,
+      error: null,
+    };
   } catch {
-    return { playlists: [], nextPageToken: null, error: 'Falha de rede ao buscar playlists do canal.' };
+    return {
+      playlists: [],
+      nextPageToken: null,
+      error: 'Falha de rede ao buscar playlists do canal.',
+    };
   }
 }
 
@@ -408,7 +612,11 @@ export async function getPlaylistItemsPage(
   pageToken?: string,
 ): Promise<PlaylistItemsPageResult> {
   if (!API_KEY) {
-    return { songs: [], nextPageToken: null, error: 'Chave da API do YouTube não configurada.' };
+    return {
+      songs: [],
+      nextPageToken: null,
+      error: 'Chave da API do YouTube não configurada.',
+    };
   }
 
   const cleanId = playlistId.replace('yt-playlist:', '');
@@ -419,15 +627,26 @@ export async function getPlaylistItemsPage(
     maxResults: '20',
     key: API_KEY,
   });
+
   if (pageToken) params.set('pageToken', pageToken);
 
   try {
     const res = await fetch(`${PLAYLIST_ITEMS_ENDPOINT}?${params}`);
+
     if (!res.ok) {
       if (res.status === 403) {
-        return { songs: [], nextPageToken: null, error: 'Cota da API excedida.' };
+        return {
+          songs: [],
+          nextPageToken: null,
+          error: 'Cota da API excedida.',
+        };
       }
-      return { songs: [], nextPageToken: null, error: `Erro ao buscar itens da playlist (HTTP ${res.status}).` };
+
+      return {
+        songs: [],
+        nextPageToken: null,
+        error: `Erro ao buscar itens da playlist (HTTP ${res.status}).`,
+      };
     }
 
     const data = await res.json();
@@ -443,7 +662,10 @@ export async function getPlaylistItemsPage(
         artistId: `yt-channel:${item.snippet.channelTitle}`,
         album: 'YouTube',
         albumId: 'yt',
-        cover: item.snippet.thumbnails.medium?.url ?? item.snippet.thumbnails.default?.url ?? '',
+        cover:
+          item.snippet.thumbnails.medium?.url ??
+          item.snippet.thumbnails.default?.url ??
+          '',
         duration: 0,
         melody: [],
         bass: [],
@@ -452,8 +674,16 @@ export async function getPlaylistItemsPage(
         youtubeId: item.snippet.resourceId.videoId,
       }));
 
-    return { songs, nextPageToken, error: null };
+    return {
+      songs: await addVideoDurations(songs),
+      nextPageToken,
+      error: null,
+    };
   } catch {
-    return { songs: [], nextPageToken: null, error: 'Falha de rede ao buscar itens da playlist.' };
+    return {
+      songs: [],
+      nextPageToken: null,
+      error: 'Falha de rede ao buscar itens da playlist.',
+    };
   }
 }
