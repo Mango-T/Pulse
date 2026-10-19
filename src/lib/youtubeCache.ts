@@ -208,7 +208,7 @@ export async function refreshCache<T>(
   inflight.delete(key);
   const result = await compute();
 
-  if (result !== undefined && (!shouldCache || shouldCache(result))) {
+    if (result !== undefined && (!shouldCache || shouldCache(result))) {
     setCache(key, result);
   }
 
