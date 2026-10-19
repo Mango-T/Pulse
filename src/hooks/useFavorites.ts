@@ -60,21 +60,23 @@ export function useFavorites() {
   const favoriteSongs: Song[] = items.map((f) => f.song);
 
   const toggleFavorite = useCallback(
-    (song: Song) => {
-      setItems((prev) => {
-        const idx = prev.findIndex((f) => f.song.id === song.id);
-        let next: StoredFavorite[];
-        if (idx >= 0) {
-          next = prev.filter((_, i) => i !== idx);
-        } else {
-          next = [...prev, { song, addedAt: Date.now() }];
-        }
-        save(next);
-        return next;
-      });
-    },
-    [save],
-  );
+  (song: Song) => {
+    if (!userId || !isLoaded) return;
+
+    setItems((prev) => {
+      const idx = prev.findIndex((f) => f.song.id === song.id);
+
+      const next: StoredFavorite[] =
+        idx >= 0
+          ? prev.filter((_, i) => i !== idx)
+          : [...prev, { song, addedAt: Date.now() }];
+
+      saveStored(storageKey, next);
+      return next;
+    });
+  },
+  [userId, isLoaded, storageKey],
+);
 
   const isFavorite = useCallback(
     (songId: string) => favoriteIds.has(songId),
