@@ -94,6 +94,11 @@ export function App() {
     [authLoading, user, createPlaylist],
   );
 
+  const handleRequestPlaylistLogin = useCallback(() => {
+    setLoginModalReason('playlist');
+    setShowLoginModal(true);
+  }, []);
+
   const profile: UserProfile | null = user ? userToProfile(user) : null;
 
   const favoritesPlaylist: UserPlaylist = useMemo(
@@ -228,11 +233,12 @@ export function App() {
               playlists={userPlaylists}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
+              isLoggedIn={!!user}
+              onRequestLogin={handleRequestPlaylistLogin}
               onPlayPlaylist={handlePlayPlaylist}
               onOpenPlaylist={(playlistId) => {
                 if (playlistId !== 'favorites' && !user) {
-                  setLoginModalReason('playlist');
-                  setShowLoginModal(true);
+                  handleRequestPlaylistLogin();
                   return;
                 }
 
@@ -257,8 +263,7 @@ export function App() {
                 if (authLoading) return;
 
                 if (!user) {
-                  setLoginModalReason('playlist');
-                  setShowLoginModal(true);
+                  handleRequestPlaylistLogin();
                   return;
                 }
 
@@ -270,8 +275,7 @@ export function App() {
                 if (authLoading) return;
 
                 if (!user) {
-                  setLoginModalReason('playlist');
-                  setShowLoginModal(true);
+                  handleRequestPlaylistLogin();
                   return;
                 }
 
@@ -283,8 +287,7 @@ export function App() {
                 if (authLoading) return;
 
                 if (!user) {
-                  setLoginModalReason('playlist');
-                  setShowLoginModal(true);
+                  handleRequestPlaylistLogin();
                   return;
                 }
 
@@ -296,8 +299,7 @@ export function App() {
                 if (authLoading) return;
 
                 if (!user) {
-                  setLoginModalReason('playlist');
-                  setShowLoginModal(true);
+                  handleRequestPlaylistLogin();
                   return;
                 }
 
