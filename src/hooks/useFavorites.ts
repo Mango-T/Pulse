@@ -1,87 +1,131 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { Song } from '@/types';
-import { songs as allSongs, getSongById } from '@/data/mockData';
 
-const STORAGE_KEY = 'pulse:favorites';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Song } from '@/types';
+import { getSongById } from '@/data/mockData';
+
+const LEGACY_KEY = 'pulse:favorites';
+const MIGRATION_KEY = 'pulse:favorites:migrated:v1';
 
 interface StoredFavorite {
   song: Song;
   addedAt: number;
 }
 
-function loadStored(): StoredFavorite[] {
+function loadStored(key: string): StoredFavorite[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
+
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      if (parsed.length === 0) return [];
-      if (typeof parsed[0] === 'string') {
-        const ids = parsed as string[];
-        return ids
-          .map((id) => {
-            const song = getSongById(id);
-            return song ? { song, addedAt: 0 } : null;
-          })
-          .filter((x): x is StoredFavorite => x !== null);
-      }
-      if (typeof parsed[0] === 'object' && 'song' in parsed[0]) {
-        return parsed as StoredFavorite[];
-      }
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+
+    if (typeof parsed[0] === 'string') {
+      return (parsed as string[])
+        .map((id) => {
+          const song = getSongById(id);
+          return song ? { song, addedAt: 0 } : null;
+        })
+        .filter((item): item is StoredFavorite => item !== null);
     }
+
+    if (
+      typeof parsed[0] === 'object' &&
+      parsed[0] !== null &&
+      'song' in parsed[0]
+    ) {
+      return parsed as StoredFavorite[];
+    }
+
     return [];
   } catch {
     return [];
   }
 }
 
-function saveStored(items: StoredFavorite[]) {
+function saveStored(key: string, items: StoredFavorite[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(key, JSON.stringify(items));
   } catch {
-    // ignore
+    // Mantém o aplicativo funcional se o armazenamento falhar.
   }
 }
 
-export function useFavorites() {
+function migrateLegacyFavorites(targetKey: string) {
+  try {
+    if (localStorage.getItem(MIGRATION_KEY)) return;
+
+    const legacy = localStorage.getItem(LEGACY_KEY);
+
+    if (legacy !== null) {
+      if (localStorage.getItem(targetKey) === null) {
+        saveStored(targetKey, loadStored(LEGACY_KEY));
+      }
+
+      localStorage.setItem(MIGRATION_KEY, 'true');
+    }
+  } catch {
+    // Não interrompe o aplicativo.
+  }
+}
+
+export function useFavorites(userId: string | null, authLoading = false) {
+  const storageKey = `pulse:favorites:${userId ?? 'anonymous'}`;
+
   const [items, setItems] = useState<StoredFavorite[]>([]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
   useEffect(() => {
-    setItems(loadStored());
-  }, []);
+    if (authLoading) return;
 
-  const save = useCallback((next: StoredFavorite[]) => {
-    saveStored(next);
-  }, []);
+    migrateLegacyFavorites(storageKey);
+    setItems(loadStored(storageKey));
+    setLoadedKey(storageKey);
+  }, [storageKey, authLoading]);
 
-  const favorites = items;
-  const favoriteIds = new Set(items.map((f) => f.song.id));
+  const isLoaded = !authLoading && loadedKey === storageKey;
+  const favorites = userId && isLoaded ? items : [];
 
-  const favoriteSongs: Song[] = items.map((f) => f.song);
+  const favoriteIds = useMemo(
+    () => new Set(favorites.map((favorite) => favorite.song.id)),
+    [favorites],
+  );
+
+  const favoriteSongs = useMemo(
+    () => favorites.map((favorite) => favorite.song),
+    [favorites],
+  );
 
   const toggleFavorite = useCallback(
-  (song: Song) => {
-    if (!userId || !isLoaded) return;
+    (song: Song) => {
+      if (!userId || !isLoaded) return;
 
-    setItems((prev) => {
-      const idx = prev.findIndex((f) => f.song.id === song.id);
+      setItems((prev) => {
+        const index = prev.findIndex(
+          (favorite) => favorite.song.id === song.id,
+        );
 
-      const next: StoredFavorite[] =
-        idx >= 0
-          ? prev.filter((_, i) => i !== idx)
-          : [...prev, { song, addedAt: Date.now() }];
+        const next: StoredFavorite[] =
+          index >= 0
+            ? prev.filter((_, i) => i !== index)
+            : [...prev, { song, addedAt: Date.now() }];
 
-      saveStored(storageKey, next);
-      return next;
-    });
-  },
-  [userId, isLoaded, storageKey],
-);
+        saveStored(storageKey, next);
+        return next;
+      });
+    },
+    [userId, isLoaded, storageKey],
+  );
 
   const isFavorite = useCallback(
     (songId: string) => favoriteIds.has(songId),
     [favoriteIds],
   );
 
-  return { favorites, favoriteIds, favoriteSongs, toggleFavorite, isFavorite };
+  return {
+    favorites,
+    favoriteIds,
+    favoriteSongs,
+    toggleFavorite,
+    isFavorite,
+  };
 }
