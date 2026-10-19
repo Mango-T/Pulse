@@ -79,9 +79,11 @@ async function addVideoDurations(songs: Song[]): Promise<Song[]> {
     );
 
     return songs.map((song) => ({
-      ...song,
-      duration: durations.get(song.youtubeId) ?? song.duration,
-    }));
+  ...song,
+  duration: song.youtubeId
+    ? durations.get(song.youtubeId) ?? song.duration
+    : song.duration,
+}));
   } catch {
     // Uma falha ao consultar durações não deve impedir a exibição dos vídeos.
     return songs;
