@@ -38,7 +38,8 @@ export function App() {
 
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const player = usePlayer();
-  const { favorites, favoriteIds, favoriteSongs, toggleFavorite, isFavorite } = useFavorites();
+  const { favorites, favoriteIds, favoriteSongs, toggleFavorite, isFavorite } =
+  useFavorites(user?.id ?? null, authLoading);
   const {
     playlists: userPlaylists,
     createPlaylist,
