@@ -199,6 +199,7 @@ export function getOrCompute<T>(
  * cached data intact. If `shouldCache` is provided and returns false, the
  * existing cache entry for this key is invalidated instead of replaced.
  */
+
 export async function refreshCache<T>(
   key: string,
   compute: () => Promise<T>,
@@ -206,13 +207,14 @@ export async function refreshCache<T>(
 ): Promise<T> {
   inflight.delete(key);
   const result = await compute();
+
   if (result !== undefined && (!shouldCache || shouldCache(result))) {
     setCache(key, result);
-  } else if (shouldCache && !shouldCache(result)) {
-    invalidateCache(key);
   }
+
   return result;
 }
+
 
 /** Remove a single entry. */
 export function invalidateCache(key: string): void {
