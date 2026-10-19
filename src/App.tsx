@@ -68,11 +68,11 @@ export function App() {
     (song: Song) => {
       if (authLoading) return;
 
-     if (!user) {
-  setLoginModalReason('favorite');
-  setShowLoginModal(true);
-  return;
-}
+      if (!user) {
+        setLoginModalReason('favorite');
+        setShowLoginModal(true);
+        return;
+      }
 
       toggleFavorite(song);
     },
@@ -84,10 +84,10 @@ export function App() {
       if (authLoading) return;
 
       if (!user) {
-  setLoginModalReason('playlist');
-  setShowLoginModal(true);
-  return;
-}
+        setLoginModalReason('playlist');
+        setShowLoginModal(true);
+        return;
+      }
 
       createPlaylist(title);
     },
@@ -231,6 +231,7 @@ export function App() {
               onPlayPlaylist={handlePlayPlaylist}
               onOpenPlaylist={(playlistId) => {
                 if (playlistId !== 'favorites' && !user) {
+                  setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
@@ -254,6 +255,7 @@ export function App() {
               onAddSong={(song) => {
                 if (authLoading) return;
                 if (!user) {
+                  setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
@@ -264,6 +266,7 @@ export function App() {
               onRemoveSong={(songId) => {
                 if (authLoading) return;
                 if (!user) {
+                  setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
@@ -274,6 +277,7 @@ export function App() {
               onRename={(newTitle) => {
                 if (authLoading) return;
                 if (!user) {
+                  setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
@@ -284,6 +288,7 @@ export function App() {
               onDelete={() => {
                 if (authLoading) return;
                 if (!user) {
+                  setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
@@ -373,7 +378,9 @@ export function App() {
             </div>
 
             <p className="mb-6 text-sm leading-relaxed text-neutral-300">
-              Para favoritar suas músicas e criar playlists, faça login.
+              {loginModalReason === 'playlist'
+                ? 'Para criar uma playlist, faça login.'
+                : 'Para salvar músicas nos favoritos, faça login.'}
             </p>
 
             <button
