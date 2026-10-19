@@ -37,27 +37,60 @@ export function App() {
   const [selectedUserPlaylistId, setSelectedUserPlaylistId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    signInWithGoogle,
+    signOut,
+  } = useAuth();
 
-const player = usePlayer();
+  const player = usePlayer();
 
-const {
-  favorites,
-  favoriteIds,
-  favoriteSongs,
-  toggleFavorite,
-  isFavorite,
-} = useFavorites(user?.id ?? null, authLoading);
+  const {
+    favorites,
+    favoriteIds,
+    favoriteSongs,
+    toggleFavorite,
+    isFavorite,
+  } = useFavorites(user?.id ?? null, authLoading);
 
-const {
-  playlists: userPlaylists,
-  createPlaylist,
-  renamePlaylist,
-  deletePlaylist,
-  addSongToPlaylist,
-  removeSongFromPlaylist,
-  getPlaylistById,
-} = usePlaylists(user?.id ?? null);
+  const {
+    playlists: userPlaylists,
+    createPlaylist,
+    renamePlaylist,
+    deletePlaylist,
+    addSongToPlaylist,
+    removeSongFromPlaylist,
+    getPlaylistById,
+  } = usePlaylists(user?.id ?? null);
+
+  const handleFavoriteClick = useCallback(
+    (song: Song) => {
+      if (authLoading) return;
+
+      if (!user) {
+        setShowLoginModal(true);
+        return;
+      }
+
+      toggleFavorite(song);
+    },
+    [authLoading, user, toggleFavorite],
+  );
+
+  const handleCreatePlaylist = useCallback(
+    (...args: Parameters<typeof createPlaylist>) => {
+      if (authLoading) return;
+
+      if (!user) {
+        setShowLoginModal(true);
+        return;
+      }
+
+      return createPlaylist(...args);
+    },
+    [authLoading, user, createPlaylist],
+  );
 
   const profile: UserProfile | null = user ? userToProfile(user) : null;
 
