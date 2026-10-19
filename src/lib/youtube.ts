@@ -1,5 +1,6 @@
 
 import type { Song, Channel, YTPlaylist } from '@/types';
+import { getOrCompute, refreshCache } from '@/lib/youtubeCache';
 
 const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
 const SEARCH_ENDPOINT = 'https://www.googleapis.com/youtube/v3/search';
@@ -98,12 +99,41 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchResult>
   const trimmed = query.trim();
   if (!trimmed) return { songs: [], error: null };
 
+  const cacheKey = `search:q=${trimmed}:max=10`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchYouTubeSearch(trimmed),
+    (r) => r.error === null,
+  );
+}
+
+/** Force a fresh YouTube search, bypassing the cache. Updates the cache only on success. */
+export async function refreshYouTubeSearch(query: string): Promise<YouTubeSearchResult> {
+  if (!API_KEY) {
+    return {
+      songs: [],
+      error: 'Chave da API do YouTube não configurada. Adicione VITE_YOUTUBE_API_KEY no arquivo .env',
+    };
+  }
+
+  const trimmed = query.trim();
+  if (!trimmed) return { songs: [], error: null };
+
+  const cacheKey = `search:q=${trimmed}:max=10`;
+  return refreshCache(
+    cacheKey,
+    () => fetchYouTubeSearch(trimmed),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchYouTubeSearch(trimmed: string): Promise<YouTubeSearchResult> {
   const params = new URLSearchParams({
     part: 'snippet',
     type: 'video',
     maxResults: '10',
     q: trimmed,
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   try {
@@ -199,12 +229,21 @@ export async function searchYouTubeChannels(
   const trimmed = query.trim();
   if (!trimmed) return { channels: [], error: null };
 
+  const cacheKey = `channels:q=${trimmed}:max=5`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchYouTubeChannels(trimmed),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchYouTubeChannels(trimmed: string): Promise<YouTubeChannelResult> {
   const params = new URLSearchParams({
     part: 'snippet',
     type: 'channel',
     maxResults: '5',
     q: trimmed,
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   try {
@@ -280,11 +319,23 @@ export async function getChannelVideosPage(
     };
   }
 
+  const cacheKey = `channelVideos:pl=${uploadsPlaylistId}:max=20:page=${pageToken ?? ''}`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchChannelVideosPage(uploadsPlaylistId, pageToken),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchChannelVideosPage(
+  uploadsPlaylistId: string,
+  pageToken?: string,
+): Promise<ChannelVideosPageResult> {
   const params = new URLSearchParams({
     part: 'snippet',
     playlistId: uploadsPlaylistId,
     maxResults: '20',
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   if (pageToken) params.set('pageToken', pageToken);
@@ -362,12 +413,27 @@ export async function getChannelDetails(
     };
   }
 
+  const cacheKey = `channelDetails:id=${channelId}`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchChannelDetails(channelId),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchChannelDetails(
+  channelId: string,
+): Promise<{
+  channel: Channel | null;
+  uploadsPlaylistId: string | null;
+  error: string | null;
+}> {
   const cleanId = channelId.replace('yt-channel:', '');
 
   const params = new URLSearchParams({
     part: 'snippet,contentDetails',
     id: cleanId,
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   try {
@@ -450,12 +516,24 @@ export async function searchYouTubePlaylists(
     return { playlists: [], nextPageToken: null, error: null };
   }
 
+  const cacheKey = `playlists:q=${trimmed}:max=10:page=${pageToken ?? ''}`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchYouTubePlaylists(trimmed, pageToken),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchYouTubePlaylists(
+  trimmed: string,
+  pageToken?: string,
+): Promise<YouTubePlaylistSearchResult> {
   const params = new URLSearchParams({
     part: 'snippet',
     type: 'playlist',
     maxResults: '10',
     q: trimmed,
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   if (pageToken) params.set('pageToken', pageToken);
@@ -543,13 +621,25 @@ export async function getChannelPlaylists(
     };
   }
 
+  const cacheKey = `channelPlaylists:id=${channelId}:max=10:page=${pageToken ?? ''}`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchChannelPlaylists(channelId, pageToken),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchChannelPlaylists(
+  channelId: string,
+  pageToken?: string,
+): Promise<ChannelPlaylistsResult> {
   const cleanId = channelId.replace('yt-channel:', '');
 
   const params = new URLSearchParams({
     part: 'snippet,contentDetails',
     channelId: cleanId,
     maxResults: '10',
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   if (pageToken) params.set('pageToken', pageToken);
@@ -619,13 +709,25 @@ export async function getPlaylistItemsPage(
     };
   }
 
+  const cacheKey = `playlistItems:id=${playlistId}:max=20:page=${pageToken ?? ''}`;
+  return getOrCompute(
+    cacheKey,
+    () => fetchPlaylistItemsPage(playlistId, pageToken),
+    (r) => r.error === null,
+  );
+}
+
+async function fetchPlaylistItemsPage(
+  playlistId: string,
+  pageToken?: string,
+): Promise<PlaylistItemsPageResult> {
   const cleanId = playlistId.replace('yt-playlist:', '');
 
   const params = new URLSearchParams({
     part: 'snippet',
     playlistId: cleanId,
     maxResults: '20',
-    key: API_KEY,
+    key: API_KEY!,
   });
 
   if (pageToken) params.set('pageToken', pageToken);

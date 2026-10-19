@@ -91,7 +91,7 @@ export function SearchView({
       setYtResults(result.songs);
       setYtError(result.error);
       setYtLoading(false);
-    }, 600);
+    }, 400);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,7 +126,7 @@ export function SearchView({
       setYtChannels(result.channels);
       setYtChannelsError(result.error);
       setYtChannelsLoading(false);
-    }, 600);
+    }, 400);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
