@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Home as HomeIcon, Search as SearchIcon, Library, Loader2 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import type { View, Song, PlayerMode, UserProfile, YTPlaylist, UserPlaylist } from '@/types';
