@@ -53,10 +53,6 @@ export function Sidebar({ currentView, onNavigate, favoriteCount, user, onSignOu
             >
               <Icon size={20} className={active ? 'text-emerald-400' : ''} />
               {item.label}
-              {item.id === 'library' && favoriteCount > 0 && (
-                <span className="ml-auto bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full">
-                  {favoriteCount}
-                </span>
               )}
             </button>
           );
