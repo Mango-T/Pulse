@@ -37,22 +37,26 @@ export function App() {
   const [selectedUserPlaylistId, setSelectedUserPlaylistId] = useState<string | null>(null);
 
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const player = usePlayer();
-  const {
+
+const player = usePlayer();
+
+const {
   favorites,
   favoriteIds,
   favoriteSongs,
   toggleFavorite,
   isFavorite,
 } = useFavorites(user?.id ?? null, authLoading);
-    playlists: userPlaylists,
-    createPlaylist,
-    renamePlaylist,
-    deletePlaylist,
-    addSongToPlaylist,
-    removeSongFromPlaylist,
-    getPlaylistById,
-  } = usePlaylists(user?.id ?? null);
+
+const {
+  playlists: userPlaylists,
+  createPlaylist,
+  renamePlaylist,
+  deletePlaylist,
+  addSongToPlaylist,
+  removeSongFromPlaylist,
+  getPlaylistById,
+} = usePlaylists(user?.id ?? null);
 
   const profile: UserProfile | null = user ? userToProfile(user) : null;
 
