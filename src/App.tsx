@@ -35,6 +35,7 @@ export function App() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<YTPlaylist | null>(null);
   const [selectedUserPlaylistId, setSelectedUserPlaylistId] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
 
