@@ -80,19 +80,19 @@ export function App() {
   );
 
   const handleCreatePlaylist = useCallback(
-  (title: string) => {
-    if (authLoading) return;
+    (title: string) => {
+      if (authLoading) return;
 
-    if (!user) {
-      setLoginModalReason('playlist');
-      setShowLoginModal(true);
-      return;
-    }
+      if (!user) {
+        setLoginModalReason('playlist');
+        setShowLoginModal(true);
+        return;
+      }
 
-    createPlaylist(title);
-  },
-  [authLoading, user, createPlaylist]
-);
+      createPlaylist(title);
+    },
+    [authLoading, user, createPlaylist],
+  );
 
   const profile: UserProfile | null = user ? userToProfile(user) : null;
 
@@ -235,6 +235,7 @@ export function App() {
                   setShowLoginModal(true);
                   return;
                 }
+
                 setSelectedUserPlaylistId(playlistId);
                 setView('my-playlist');
               }}
@@ -254,44 +255,52 @@ export function App() {
               onToggleFavorite={handleFavoriteClick}
               onAddSong={(song) => {
                 if (authLoading) return;
+
                 if (!user) {
                   setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
+
                 if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
                   addSongToPlaylist(selectedUserPlaylistId, song);
                 }
               }}
               onRemoveSong={(songId) => {
                 if (authLoading) return;
+
                 if (!user) {
                   setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
+
                 if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
                   removeSongFromPlaylist(selectedUserPlaylistId, songId);
                 }
               }}
               onRename={(newTitle) => {
                 if (authLoading) return;
+
                 if (!user) {
                   setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
+
                 if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
                   renamePlaylist(selectedUserPlaylistId, newTitle);
                 }
               }}
               onDelete={() => {
                 if (authLoading) return;
+
                 if (!user) {
                   setLoginModalReason('playlist');
                   setShowLoginModal(true);
                   return;
                 }
+
                 if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
                   deletePlaylist(selectedUserPlaylistId);
                   setSelectedUserPlaylistId(null);
