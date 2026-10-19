@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Heart, Plus, X, Music, Play } from 'lucide-react';
 import type { Song, UserPlaylist } from '@/types';
@@ -7,6 +8,8 @@ interface LibraryViewProps {
   playlists: UserPlaylist[];
   currentSongId: string | null;
   isPlaying: boolean;
+  isLoggedIn: boolean;
+  onRequestLogin: () => void;
   onPlayPlaylist: (songs: Song[]) => void;
   onOpenPlaylist: (playlistId: string) => void;
   onCreatePlaylist: (title: string) => void;
@@ -17,6 +20,8 @@ export function LibraryView({
   playlists,
   currentSongId,
   isPlaying,
+  isLoggedIn,
+  onRequestLogin,
   onPlayPlaylist,
   onOpenPlaylist,
   onCreatePlaylist,
@@ -27,20 +32,40 @@ export function LibraryView({
   const handleCreate = () => {
     const title = newTitle.trim();
     if (!title) return;
+
+    if (!isLoggedIn) {
+      setShowCreateForm(false);
+      setNewTitle('');
+      onRequestLogin();
+      return;
+    }
+
     onCreatePlaylist(title);
     setNewTitle('');
     setShowCreateForm(false);
+  };
+
+  const handleOpenCreateForm = () => {
+    if (!isLoggedIn) {
+      onRequestLogin();
+      return;
+    }
+
+    setShowCreateForm(true);
   };
 
   const hasAnyPlaylists = favoriteSongs.length > 0 || playlists.length > 0;
 
   return (
     <div className="px-4 md:px-6 pb-6">
-      {/* Header with Create button */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-white text-lg md:text-xl font-bold">Minhas Playlists</h2>
+        <h2 className="text-white text-lg md:text-xl font-bold">
+          Minhas Playlists
+        </h2>
+
         <button
-          onClick={() => setShowCreateForm(true)}
+          type="button"
+          onClick={handleOpenCreateForm}
           className="flex items-center gap-2 bg-white text-black rounded-full px-4 py-2 text-sm font-semibold hover:bg-neutral-200 transition-colors"
         >
           <Plus size={16} />
@@ -48,7 +73,6 @@ export function LibraryView({
         </button>
       </div>
 
-      {/* Create playlist modal */}
       {showCreateForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
@@ -65,9 +89,13 @@ export function LibraryView({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 id="create-playlist-title" className="text-xl font-bold text-white">
+              <h2
+                id="create-playlist-title"
+                className="text-xl font-bold text-white"
+              >
                 Criar playlist
               </h2>
+
               <button
                 type="button"
                 onClick={() => {
@@ -104,6 +132,7 @@ export function LibraryView({
               >
                 Cancelar
               </button>
+
               <button
                 type="button"
                 onClick={handleCreate}
@@ -122,14 +151,17 @@ export function LibraryView({
           <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center mb-6">
             <Music size={36} className="text-neutral-600" />
           </div>
-          <p className="text-white text-lg font-bold">Sua biblioteca está vazia</p>
+
+          <p className="text-white text-lg font-bold">
+            Sua biblioteca está vazia
+          </p>
+
           <p className="text-neutral-500 text-sm mt-2 max-w-sm">
             Crie uma playlist ou curta músicas para começar sua coleção.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-          {/* Favorites — fixed playlist */}
           {favoriteSongs.length > 0 && (
             <div
               onClick={() => onOpenPlaylist('favorites')}
@@ -139,7 +171,9 @@ export function LibraryView({
                 <div className="w-full h-full rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
                   <Heart size={48} className="text-white fill-white" />
                 </div>
+
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onPlayPlaylist(favoriteSongs);
@@ -149,16 +183,19 @@ export function LibraryView({
                   <Play size={18} className="text-black fill-black ml-0.5" />
                 </button>
               </div>
+
               <div className="min-w-0">
-                <p className="text-white text-sm font-semibold truncate">Favoritos</p>
+                <p className="text-white text-sm font-semibold truncate">
+                  Favoritos
+                </p>
                 <p className="text-neutral-400 text-xs mt-1">
-                  {favoriteSongs.length} {favoriteSongs.length === 1 ? 'música' : 'músicas'}
+                  {favoriteSongs.length}{' '}
+                  {favoriteSongs.length === 1 ? 'música' : 'músicas'}
                 </p>
               </div>
             </div>
           )}
 
-          {/* User-created playlists */}
           {playlists.map((pl) => (
             <div
               key={pl.id}
@@ -178,8 +215,10 @@ export function LibraryView({
                     <Music size={40} className="text-neutral-500" />
                   </div>
                 )}
+
                 {pl.songs.length > 0 && (
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onPlayPlaylist(pl.songs);
@@ -190,10 +229,14 @@ export function LibraryView({
                   </button>
                 )}
               </div>
+
               <div className="min-w-0">
-                <p className="text-white text-sm font-semibold truncate">{pl.title}</p>
+                <p className="text-white text-sm font-semibold truncate">
+                  {pl.title}
+                </p>
                 <p className="text-neutral-400 text-xs mt-1">
-                  {pl.songs.length} {pl.songs.length === 1 ? 'música' : 'músicas'}
+                  {pl.songs.length}{' '}
+                  {pl.songs.length === 1 ? 'música' : 'músicas'}
                 </p>
               </div>
             </div>
