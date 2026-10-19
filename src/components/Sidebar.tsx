@@ -53,7 +53,6 @@ export function Sidebar({ currentView, onNavigate, favoriteCount, user, onSignOu
             >
               <Icon size={20} className={active ? 'text-emerald-400' : ''} />
               {item.label}
-              )}
             </button>
           );
         })}
