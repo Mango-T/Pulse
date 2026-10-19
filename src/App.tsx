@@ -80,19 +80,19 @@ export function App() {
   );
 
   const handleCreatePlaylist = useCallback(
-    (title: string) => {
-      if (authLoading) return;
+  (title: string) => {
+    if (authLoading) return;
 
-      if (!user) {
-        setLoginModalReason('playlist');
-        setShowLoginModal(true);
-        return;
-      }
+    if (!user) {
+      setLoginModalReason('playlist');
+      setShowLoginModal(true);
+      return;
+    }
 
-      createPlaylist(title);
-    },
-    [authLoading, user, createPlaylist],
-  );
+    createPlaylist(title);
+  },
+  [authLoading, user, createPlaylist]
+);
 
   const profile: UserProfile | null = user ? userToProfile(user) : null;
 
