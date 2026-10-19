@@ -1,3 +1,4 @@
+
 import { useCallback, useMemo, useState } from 'react';
 import { Home as HomeIcon, Search as SearchIcon, Library, Loader2 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
@@ -14,7 +15,6 @@ import { YouTubePlayerView } from '@/components/YouTubePlayerView';
 import { HomeView } from '@/views/HomeView';
 import { SearchView } from '@/views/SearchView';
 import { LibraryView } from '@/views/LibraryView';
-import { AuthView } from '@/views/AuthView';
 import { ChannelView } from '@/views/ChannelView';
 import { PlaylistView } from '@/views/PlaylistView';
 import { UserPlaylistView } from '@/views/UserPlaylistView';
@@ -47,7 +47,6 @@ export function App() {
   const player = usePlayer();
 
   const {
-    favorites,
     favoriteIds,
     favoriteSongs,
     toggleFavorite,
@@ -79,7 +78,7 @@ export function App() {
   );
 
   const handleCreatePlaylist = useCallback(
-    (...args: Parameters<typeof createPlaylist>) => {
+    (title: string) => {
       if (authLoading) return;
 
       if (!user) {
@@ -87,7 +86,7 @@ export function App() {
         return;
       }
 
-      return createPlaylist(...args);
+      createPlaylist(title);
     },
     [authLoading, user, createPlaylist],
   );
@@ -167,7 +166,7 @@ export function App() {
               favorites={favoriteIds}
               onPlaySong={handlePlaySong}
               onPlayPlaylist={handlePlayPlaylist}
-              onToggleFavorite={toggleFavorite}
+              onToggleFavorite={handleFavoriteClick}
             />
           )}
 
@@ -178,7 +177,7 @@ export function App() {
               isPlaying={player.isPlaying}
               favorites={favoriteIds}
               onPlaySong={handlePlaySong}
-              onToggleFavorite={toggleFavorite}
+              onToggleFavorite={handleFavoriteClick}
               onOpenChannel={(channelId) => {
                 setSelectedChannelId(channelId);
                 setView('channel');
@@ -197,7 +196,7 @@ export function App() {
               isPlaying={player.isPlaying}
               favorites={favoriteIds}
               onPlaySong={handlePlaySong}
-              onToggleFavorite={toggleFavorite}
+              onToggleFavorite={handleFavoriteClick}
               onOpenPlaylist={(playlist) => {
                 setSelectedPlaylist(playlist);
                 setView('playlist');
@@ -215,7 +214,7 @@ export function App() {
               isPlaying={player.isPlaying}
               favorites={favoriteIds}
               onPlaySong={handlePlaySong}
-              onToggleFavorite={toggleFavorite}
+              onToggleFavorite={handleFavoriteClick}
               onBack={() => setView(selectedChannelId ? 'channel' : 'search')}
             />
           )}
@@ -228,12 +227,14 @@ export function App() {
               isPlaying={player.isPlaying}
               onPlayPlaylist={handlePlayPlaylist}
               onOpenPlaylist={(playlistId) => {
+                if (playlistId !== 'favorites' && !user) {
+                  setShowLoginModal(true);
+                  return;
+                }
                 setSelectedUserPlaylistId(playlistId);
                 setView('my-playlist');
               }}
-              onCreatePlaylist={(title) => {
-                createPlaylist(title);
-              }}
+              onCreatePlaylist={handleCreatePlaylist}
             />
           )}
 
@@ -246,18 +247,44 @@ export function App() {
               favoriteIds={favoriteIds}
               onPlaySong={handlePlaySong}
               onPlayAll={handlePlayPlaylist}
-              onToggleFavorite={toggleFavorite}
+              onToggleFavorite={handleFavoriteClick}
               onAddSong={(song) => {
-                if (selectedUserPlaylistId) addSongToPlaylist(selectedUserPlaylistId, song);
+                if (authLoading) return;
+                if (!user) {
+                  setShowLoginModal(true);
+                  return;
+                }
+                if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
+                  addSongToPlaylist(selectedUserPlaylistId, song);
+                }
               }}
               onRemoveSong={(songId) => {
-                if (selectedUserPlaylistId) removeSongFromPlaylist(selectedUserPlaylistId, songId);
+                if (authLoading) return;
+                if (!user) {
+                  setShowLoginModal(true);
+                  return;
+                }
+                if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
+                  removeSongFromPlaylist(selectedUserPlaylistId, songId);
+                }
               }}
               onRename={(newTitle) => {
-                if (selectedUserPlaylistId) renamePlaylist(selectedUserPlaylistId, newTitle);
+                if (authLoading) return;
+                if (!user) {
+                  setShowLoginModal(true);
+                  return;
+                }
+                if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
+                  renamePlaylist(selectedUserPlaylistId, newTitle);
+                }
               }}
               onDelete={() => {
-                if (selectedUserPlaylistId) {
+                if (authLoading) return;
+                if (!user) {
+                  setShowLoginModal(true);
+                  return;
+                }
+                if (selectedUserPlaylistId && selectedUserPlaylistId !== 'favorites') {
                   deletePlaylist(selectedUserPlaylistId);
                   setSelectedUserPlaylistId(null);
                   setView('library');
@@ -286,11 +313,12 @@ export function App() {
         onToggleShuffle={player.toggleShuffle}
         onCycleRepeat={player.cycleRepeat}
         onToggleFavorite={() => {
-          if (player.currentSong) toggleFavorite(player.currentSong);
+          if (player.currentSong) {
+            handleFavoriteClick(player.currentSong);
+          }
         }}
       />
 
-      {/* Mobile bottom nav */}
       <nav className="md:hidden flex items-center justify-around bg-neutral-950 border-t border-neutral-800/50 py-2 z-50">
         {[
           { id: 'home' as View, label: 'Início', icon: HomeIcon },
@@ -299,6 +327,7 @@ export function App() {
         ].map((item) => {
           const Icon = item.icon;
           const active = view === item.id;
+
           return (
             <button
               key={item.id}
@@ -313,6 +342,58 @@ export function App() {
           );
         })}
       </nav>
+
+      {showLoginModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setShowLoginModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="login-modal-title"
+            className="w-full max-w-md rounded-2xl border border-neutral-700 bg-neutral-900 p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="login-modal-title" className="text-lg font-semibold text-white">
+                Entre no Pulse
+              </h2>
+              <button
+                type="button"
+                aria-label="Fechar modal"
+                onClick={() => setShowLoginModal(false)}
+                className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-800 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="mb-6 text-sm leading-relaxed text-neutral-300">
+              Para favoritar suas músicas e criar playlists, faça login.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowLoginModal(false);
+                void signInWithGoogle();
+              }}
+              className="w-full rounded-full bg-emerald-500 px-4 py-3 font-semibold text-black hover:bg-emerald-400"
+            >
+              Fazer login com Google
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowLoginModal(false)}
+              className="mt-3 w-full rounded-full px-4 py-3 text-sm text-neutral-300 hover:bg-neutral-800"
+            >
+              Agora não
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
