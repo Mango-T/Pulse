@@ -36,6 +36,7 @@ export function App() {
   const [selectedPlaylist, setSelectedPlaylist] = useState<YTPlaylist | null>(null);
   const [selectedUserPlaylistId, setSelectedUserPlaylistId] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginModalReason, setLoginModalReason] = useState<'favorite' | 'playlist'>('favorite');
 
   const {
     user,
@@ -67,10 +68,11 @@ export function App() {
     (song: Song) => {
       if (authLoading) return;
 
-      if (!user) {
-        setShowLoginModal(true);
-        return;
-      }
+     if (!user) {
+  setLoginModalReason('favorite');
+  setShowLoginModal(true);
+  return;
+}
 
       toggleFavorite(song);
     },
@@ -82,9 +84,10 @@ export function App() {
       if (authLoading) return;
 
       if (!user) {
-        setShowLoginModal(true);
-        return;
-      }
+  setLoginModalReason('playlist');
+  setShowLoginModal(true);
+  return;
+}
 
       createPlaylist(title);
     },
