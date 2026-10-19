@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Heart, Plus, X, Music, Play } from 'lucide-react';
 import type { Song, UserPlaylist } from '@/types';
@@ -25,19 +24,12 @@ export function LibraryView({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTitle, setNewTitle] = useState('');
 
-  const closeCreateForm = () => {
-    setShowCreateForm(false);
-    setNewTitle('');
-  };
-
   const handleCreate = () => {
     const title = newTitle.trim();
     if (!title) return;
-
-    // App.tsx decide se cria a playlist ou abre o modal de login.
     onCreatePlaylist(title);
-
-    // Não fecha o formulário aqui: o App pode precisar solicitar login.
+    setNewTitle('');
+    setShowCreateForm(false);
   };
 
   const hasAnyPlaylists = favoriteSongs.length > 0 || playlists.length > 0;
@@ -60,7 +52,10 @@ export function LibraryView({
       {showCreateForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={closeCreateForm}
+          onClick={() => {
+            setShowCreateForm(false);
+            setNewTitle('');
+          }}
         >
           <div
             role="dialog"
@@ -75,7 +70,10 @@ export function LibraryView({
               </h2>
               <button
                 type="button"
-                onClick={closeCreateForm}
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewTitle('');
+                }}
                 aria-label="Fechar"
                 className="text-neutral-400 hover:text-white p-1"
               >
@@ -98,7 +96,10 @@ export function LibraryView({
             <div className="flex justify-end gap-2 mt-6">
               <button
                 type="button"
-                onClick={closeCreateForm}
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewTitle('');
+                }}
                 className="rounded-full px-4 py-2 text-sm font-semibold text-neutral-400 hover:text-white transition-colors"
               >
                 Cancelar
