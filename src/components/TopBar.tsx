@@ -12,15 +12,19 @@ interface TopBarProps {
   onSignInWithGoogle: () => void;
 }
 
-const viewTitles: Record<View, string> = {
-  home: 'Boa tarde',
-  search: 'Buscar',
-  library: 'Minha Biblioteca',
-  channel: 'Canal',
-  playlist: 'Playlist',
-  'my-playlist': 'Playlist',
+const getGreeting = () => {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
+  return 'Boa noite';
 };
 
+const viewTitles = {
+  home: getGreeting(),
+  search: 'Buscar',
+  library: 'Minha Biblioteca',
+};
 export function TopBar({
   view,
   onNavigate,
