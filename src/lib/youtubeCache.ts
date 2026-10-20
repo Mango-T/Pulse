@@ -232,7 +232,8 @@ export function refreshCache<T>(
 
   let promise: Promise<T>;
 
-  promise = compute()
+  promise = Promise.resolve()
+    .then(compute)
     .then((result) => {
       if (
         generation === getGeneration(key) &&
@@ -254,10 +255,10 @@ export function refreshCache<T>(
   return promise;
 }
 
-
-/** Remove a single entry. */
+/** Remove a single entry and prevents older operations from restoring it. */
 export function invalidateCache(key: string): void {
   hydrateFromStorage();
+  advanceGeneration(key);
   memory.delete(key);
   inflight.delete(key);
   persist();
@@ -265,8 +266,13 @@ export function invalidateCache(key: string): void {
 
 /** Remove all entries belonging to this cache only. */
 export function clearCache(): void {
+  for (const key of memory.keys()) {
+    advanceGeneration(key);
+  }
+
   memory.clear();
   inflight.clear();
+
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
