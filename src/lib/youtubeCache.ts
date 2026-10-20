@@ -219,24 +219,39 @@ export function getOrCompute<T>(
 }
 
 /**
- * Force a fresh computation, ignoring any cached value. The cache is replaced
- * only if `compute` resolves successfully; failures leave existing valid
- * cached data intact. If `shouldCache` is provided and returns false, the
- * existing cache entry for this key is invalidated instead of replaced.
+ * Force a fresh computation, ignoring the cached value.
+ * A refresh supersedes older operations for the same key.
+ * Failed refreshes preserve the existing cached value.
  */
-
-export async function refreshCache<T>(
+export function refreshCache<T>(
   key: string,
   compute: () => Promise<T>,
   shouldCache?: (result: T) => boolean,
 ): Promise<T> {
-  const result = await compute();
+  const generation = advanceGeneration(key);
 
-  if (result !== undefined && (!shouldCache || shouldCache(result))) {
-    setCache(key, result);
-  }
+  let promise: Promise<T>;
 
-  return result;
+  promise = compute()
+    .then((result) => {
+      if (
+        generation === getGeneration(key) &&
+        result !== undefined &&
+        (!shouldCache || shouldCache(result))
+      ) {
+        setCache(key, result);
+      }
+
+      return result;
+    })
+    .finally(() => {
+      if (inflight.get(key) === promise) {
+        inflight.delete(key);
+      }
+    });
+
+  inflight.set(key, promise);
+  return promise;
 }
 
 
