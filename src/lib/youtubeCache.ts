@@ -267,7 +267,13 @@ export function invalidateCache(key: string): void {
 
 /** Remove all entries belonging to this cache only. */
 export function clearCache(): void {
-  for (const key of memory.keys()) {
+  const keys = new Set([
+    ...memory.keys(),
+    ...inflight.keys(),
+    ...generations.keys(),
+  ]);
+
+  for (const key of keys) {
     advanceGeneration(key);
   }
 
