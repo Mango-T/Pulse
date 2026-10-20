@@ -186,22 +186,34 @@ export function getOrCompute<T>(
   if (cached !== undefined) {
     return Promise.resolve(cached);
   }
+
   const existing = inflight.get(key);
   if (existing) {
     return existing as Promise<T>;
   }
-  const promise = compute()
+
+  const generation = getGeneration(key);
+
+  let promise: Promise<T>;
+
+  promise = compute()
     .then((result) => {
-      if (result !== undefined && (!shouldCache || shouldCache(result))) {
+      if (
+        generation === getGeneration(key) &&
+        result !== undefined &&
+        (!shouldCache || shouldCache(result))
+      ) {
         setCache(key, result);
       }
-      inflight.delete(key);
+
       return result;
     })
-    .catch((err) => {
-      inflight.delete(key);
-      throw err;
+    .finally(() => {
+      if (inflight.get(key) === promise) {
+        inflight.delete(key);
+      }
     });
+
   inflight.set(key, promise);
   return promise;
 }
