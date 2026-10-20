@@ -32,6 +32,7 @@ function userToProfile(u: User): UserProfile {
 export function App() {
   const [view, setView] = useState<View>('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [committedQuery, setCommittedQuery] = useState('');
   const { history: searchHistory, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const [playerMode, setPlayerMode] = useState<PlayerMode>('video');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
@@ -113,6 +114,17 @@ export function App() {
     [favoriteSongs],
   );
 
+  const handleCommitSearch = useCallback((term: string) => {
+    const trimmedTerm = term.trim();
+    setSearchQuery(trimmedTerm);
+    setCommittedQuery(trimmedTerm);
+    if (trimmedTerm) addSearch(trimmedTerm);
+  }, [addSearch]);
+
+  const handleSubmitSearch = useCallback(() => {
+    handleCommitSearch(searchQuery);
+  }, [searchQuery, handleCommitSearch]);
+
   const handlePlaySong = (song: Song, queue?: Song[]) => {
     player.playSong(song, queue);
   };
@@ -154,6 +166,7 @@ export function App() {
             onNavigate={setView}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            onSubmitSearch={handleSubmitSearch}
             isLoggedIn={!!profile}
             onSignInWithGoogle={signInWithGoogle}
           />
@@ -182,8 +195,8 @@ export function App() {
 
           {view === 'search' && (
             <SearchView
-              query={searchQuery}
-              onSearchChange={setSearchQuery}
+              query={committedQuery}
+              onCommitSearch={handleCommitSearch}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
               favorites={favoriteIds}

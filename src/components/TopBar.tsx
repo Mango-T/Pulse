@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import type { View } from '@/types';
 
 interface TopBarProps {
@@ -8,6 +8,7 @@ interface TopBarProps {
   onNavigate: (view: View) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  onSubmitSearch: () => void;
   isLoggedIn: boolean;
   onSignInWithGoogle: () => void;
 }
@@ -33,6 +34,7 @@ export function TopBar({
   onNavigate,
   searchQuery,
   onSearchChange,
+  onSubmitSearch,
   isLoggedIn,
   onSignInWithGoogle,
 }: TopBarProps) {
@@ -63,21 +65,36 @@ export function TopBar({
         </div>
 
         {view === 'search' ? (
-          <div className="flex-1 max-w-md relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              placeholder="O que você quer ouvir?"
-              className={`w-full bg-neutral-800 text-white rounded-lg pl-4 pr-4 py-2.5 text-sm placeholder:text-neutral-500 outline-none transition-all duration-200 ${
-                searchFocused
-                  ? 'ring-2 ring-emerald-400/60 bg-neutral-700'
-                  : ''
-              }`}
-            />
-          </div>
+          <form
+            className="flex-1 max-w-md relative"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmitSearch();
+            }}
+          >
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                placeholder="O que você quer ouvir?"
+                className={`w-full bg-neutral-800 text-white rounded-lg pl-4 pr-10 py-2.5 text-sm placeholder:text-neutral-500 outline-none transition-all duration-200 ${
+                  searchFocused
+                    ? 'ring-2 ring-emerald-400/60 bg-neutral-700'
+                    : ''
+                }`}
+              />
+              <button
+                type="submit"
+                aria-label="Buscar"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors md:pointer-events-none md:text-neutral-600"
+              >
+                <Search size={18} />
+              </button>
+            </div>
+          </form>
         ) : (
           <h1 className="text-white text-xl md:text-2xl font-bold tracking-tight">
             {viewTitles[view]}

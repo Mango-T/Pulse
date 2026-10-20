@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Search, Youtube, Loader2, AlertCircle, ChevronDown, Trash2, X, History } from 'lucide-react';
+import { Search, Youtube, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import type { Song, Channel, YTPlaylist } from '@/types';
 import { SongRow } from '@/components/SongRow';
 import { MediaCard } from '@/components/MediaCard';
@@ -18,7 +18,7 @@ const filterTabs: { id: SearchFilter; label: string }[] = [
 
 interface SearchViewProps {
   query: string;
-  onSearchChange: (q: string) => void;
+  onCommitSearch: (q: string) => void;
   currentSongId: string | null;
   isPlaying: boolean;
   favorites: Set<string>;
@@ -34,7 +34,7 @@ interface SearchViewProps {
 
 export function SearchView({
   query,
-  onSearchChange,
+  onCommitSearch,
   currentSongId,
   isPlaying,
   favorites,
@@ -84,21 +84,6 @@ export function SearchView({
   const [ytError, setYtError] = useState<string | null>(null);
   const queryIdRef = useRef(0);
 
-  // Registra pesquisas reais (com debounce) no histórico.
-  const recordQueryIdRef = useRef(0);
-  useEffect(() => {
-    if (!trimmed) return;
-
-    const id = ++recordQueryIdRef.current;
-    const timer = setTimeout(() => {
-      if (id !== recordQueryIdRef.current) return;
-      onAddSearch(query.trim());
-    }, 600);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trimmed]);
-
   useEffect(() => {
     if (!trimmed) {
       setYtResults([]);
@@ -111,15 +96,13 @@ export function SearchView({
     setYtLoading(true);
     setYtError(null);
 
-    const timer = setTimeout(async () => {
+    void (async () => {
       const result = await searchYouTube(query.trim());
       if (id !== queryIdRef.current) return;
       setYtResults(result.songs);
       setYtError(result.error);
       setYtLoading(false);
-    }, 400);
-
-    return () => clearTimeout(timer);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimmed]);
 
@@ -146,15 +129,13 @@ export function SearchView({
     setYtChannelsLoading(true);
     setYtChannelsError(null);
 
-    const timer = setTimeout(async () => {
+    void (async () => {
       const result = await searchYouTubeChannels(query.trim());
       if (id !== channelQueryIdRef.current) return;
       setYtChannels(result.channels);
       setYtChannelsError(result.error);
       setYtChannelsLoading(false);
-    }, 400);
-
-    return () => clearTimeout(timer);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimmed]);
 
@@ -230,7 +211,7 @@ export function SearchView({
       <div className="px-4 md:px-6 pb-6 space-y-6">
         <SearchHistory
           history={searchHistory}
-          onSelect={(term) => onSearchChange(term)}
+          onSelect={(term) => onCommitSearch(term)}
           onRemove={onRemoveSearch}
           onClear={onClearHistory}
         />
