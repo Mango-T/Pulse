@@ -39,7 +39,6 @@ interface StoredCache {
 // Accessing a key re-inserts it to move it to the end (most recently used).
 const memory = new Map<string, StoredEntry>();
 // In-flight compute promises, for deduplication of identical concurrent requests.
-// In-flight compute promises, for deduplication of identical concurrent requests.
 const inflight = new Map<string, Promise<unknown>>();
 
 // Tracks the latest operation allowed to write each cache key.
