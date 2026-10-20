@@ -39,7 +39,21 @@ interface StoredCache {
 // Accessing a key re-inserts it to move it to the end (most recently used).
 const memory = new Map<string, StoredEntry>();
 // In-flight compute promises, for deduplication of identical concurrent requests.
+// In-flight compute promises, for deduplication of identical concurrent requests.
 const inflight = new Map<string, Promise<unknown>>();
+
+// Tracks the latest operation allowed to write each cache key.
+const generations = new Map<string, number>();
+
+function getGeneration(key: string): number {
+  return generations.get(key) ?? 0;
+}
+
+function advanceGeneration(key: string): number {
+  const next = getGeneration(key) + 1;
+  generations.set(key, next);
+  return next;
+}
 
 let memoryHydrated = false;
 
