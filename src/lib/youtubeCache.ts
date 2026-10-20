@@ -182,21 +182,22 @@ export function getOrCompute<T>(
   compute: () => Promise<T>,
   shouldCache?: (result: T) => boolean,
 ): Promise<T> {
-  const cached = getCache<T>(key);
-  if (cached !== undefined) {
-    return Promise.resolve(cached);
-  }
-
   const existing = inflight.get(key);
   if (existing) {
     return existing as Promise<T>;
+  }
+
+  const cached = getCache<T>(key);
+  if (cached !== undefined) {
+    return Promise.resolve(cached);
   }
 
   const generation = getGeneration(key);
 
   let promise: Promise<T>;
 
-  promise = compute()
+  promise = Promise.resolve()
+    .then(compute)
     .then((result) => {
       if (
         generation === getGeneration(key) &&
