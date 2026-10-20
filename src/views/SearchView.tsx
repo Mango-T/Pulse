@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Search, Youtube, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { Search, Youtube, Loader2, AlertCircle, ChevronDown, Trash2, X, History } from 'lucide-react';
 import type { Song, Channel, YTPlaylist } from '@/types';
 import { SongRow } from '@/components/SongRow';
 import { MediaCard } from '@/components/MediaCard';
 import { ChannelAvatar } from '@/components/ChannelAvatar';
+import { SearchHistory } from '@/components/SearchHistory';
 import { songs as allSongs, playlists, artists, albums } from '@/data/mockData';
 import { searchYouTube, searchYouTubeChannels, searchYouTubePlaylists, isYouTubeConfigured } from '@/lib/youtube';
 
@@ -17,6 +18,7 @@ const filterTabs: { id: SearchFilter; label: string }[] = [
 
 interface SearchViewProps {
   query: string;
+  onSearchChange: (q: string) => void;
   currentSongId: string | null;
   isPlaying: boolean;
   favorites: Set<string>;
@@ -24,10 +26,15 @@ interface SearchViewProps {
   onToggleFavorite: (song: Song) => void;
   onOpenChannel: (channelId: string) => void;
   onOpenPlaylist: (playlist: YTPlaylist) => void;
+  searchHistory: string[];
+  onAddSearch: (term: string) => void;
+  onRemoveSearch: (term: string) => void;
+  onClearHistory: () => void;
 }
 
 export function SearchView({
   query,
+  onSearchChange,
   currentSongId,
   isPlaying,
   favorites,
@@ -35,6 +42,10 @@ export function SearchView({
   onToggleFavorite,
   onOpenChannel,
   onOpenPlaylist,
+  searchHistory,
+  onAddSearch,
+  onRemoveSearch,
+  onClearHistory,
 }: SearchViewProps) {
   const trimmed = query.trim().toLowerCase();
   const [activeFilter, setActiveFilter] = useState<SearchFilter>('all');
@@ -72,6 +83,21 @@ export function SearchView({
   const [ytLoading, setYtLoading] = useState(false);
   const [ytError, setYtError] = useState<string | null>(null);
   const queryIdRef = useRef(0);
+
+  // Registra pesquisas reais (com debounce) no histórico.
+  const recordQueryIdRef = useRef(0);
+  useEffect(() => {
+    if (!trimmed) return;
+
+    const id = ++recordQueryIdRef.current;
+    const timer = setTimeout(() => {
+      if (id !== recordQueryIdRef.current) return;
+      onAddSearch(query.trim());
+    }, 600);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trimmed]);
 
   useEffect(() => {
     if (!trimmed) {
@@ -201,25 +227,33 @@ export function SearchView({
 
   if (!trimmed) {
     return (
-      <div className="px-4 md:px-6 pb-6">
-        <h2 className="text-white text-lg md:text-xl font-bold mb-4">Navegar por tudo</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {browseCategories.map((cat) => (
-            <div
-              key={cat.id}
-              className={`relative h-40 rounded-xl overflow-hidden cursor-pointer bg-gradient-to-br ${cat.color} group`}
-            >
-              <p className="absolute top-3 left-3 text-white font-bold text-lg z-10">
-                {cat.label}
-              </p>
-              <img
-                src={cat.cover}
-                alt={cat.label}
-                className="absolute -bottom-3 -right-3 w-20 h-20 rounded-lg rotate-25 object-cover shadow-xl group-hover:scale-110 transition-transform duration-300"
-                loading="lazy"
-              />
-            </div>
-          ))}
+      <div className="px-4 md:px-6 pb-6 space-y-6">
+        <SearchHistory
+          history={searchHistory}
+          onSelect={(term) => onSearchChange(term)}
+          onRemove={onRemoveSearch}
+          onClear={onClearHistory}
+        />
+        <div>
+          <h2 className="text-white text-lg md:text-xl font-bold mb-4">Navegar por tudo</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {browseCategories.map((cat) => (
+              <div
+                key={cat.id}
+                className={`relative h-40 rounded-xl overflow-hidden cursor-pointer bg-gradient-to-br ${cat.color} group`}
+              >
+                <p className="absolute top-3 left-3 text-white font-bold text-lg z-10">
+                  {cat.label}
+                </p>
+                <img
+                  src={cat.cover}
+                  alt={cat.label}
+                  className="absolute -bottom-3 -right-3 w-20 h-20 rounded-lg rotate-25 object-cover shadow-xl group-hover:scale-110 transition-transform duration-300"
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

@@ -8,6 +8,7 @@ import { usePlayer } from '@/hooks/usePlayer';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlaylists } from '@/hooks/usePlaylists';
+import { useSearchHistory } from '@/hooks/useSearchHistory';
 import { Sidebar } from '@/components/Sidebar';
 import { TopBar } from '@/components/TopBar';
 import { PlayerBar } from '@/components/PlayerBar';
@@ -31,6 +32,7 @@ function userToProfile(u: User): UserProfile {
 export function App() {
   const [view, setView] = useState<View>('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const { history: searchHistory, addSearch, removeSearch, clearHistory } = useSearchHistory();
   const [playerMode, setPlayerMode] = useState<PlayerMode>('video');
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState<YTPlaylist | null>(null);
@@ -181,6 +183,7 @@ export function App() {
           {view === 'search' && (
             <SearchView
               query={searchQuery}
+              onSearchChange={setSearchQuery}
               currentSongId={player.currentSong?.id ?? null}
               isPlaying={player.isPlaying}
               favorites={favoriteIds}
@@ -194,6 +197,10 @@ export function App() {
                 setSelectedPlaylist(playlist);
                 setView('playlist');
               }}
+              searchHistory={searchHistory}
+              onAddSearch={addSearch}
+              onRemoveSearch={removeSearch}
+              onClearHistory={clearHistory}
             />
           )}
 
