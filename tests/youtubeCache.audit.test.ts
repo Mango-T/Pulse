@@ -51,7 +51,7 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: 
   return { promise, resolve, reject };
 }
 
-test('1. two simultaneous getOrCompute with same key run compute exactly once', async () => {
+test('1. two simultaneous getOrCompute with same key share a single execution', async () => {
   const mod = await freshModule();
   let calls = 0;
   const { promise: computePromise, resolve } = deferred<string>();
@@ -65,6 +65,8 @@ test('1. two simultaneous getOrCompute with same key run compute exactly once', 
     return Promise.resolve('should-not-run');
   });
 
+  // compute() runs in a microtask, so we must yield once before asserting.
+  await Promise.resolve();
   assert.equal(calls, 1, 'compute ran more than once for simultaneous same-key calls');
   resolve('v');
 
@@ -182,7 +184,9 @@ test('7a. concurrency: refreshCache while getOrCompute in flight runs a SECOND c
   assert.equal(calls, 2, 'expected a duplicate compute from refresh-in-flight');
 });
 
-test('7b. concurrency: stale getOrCompute can overwrite a fresh refreshCache result (out-of-order write)', async () => {
+test('7b. concurrency: stale getOrCompute does NOT overwrite a fresh refreshCache result', async () => {
+  // The generation guard prevents an older getOrCompute from writing its result
+  // after a refreshCache has already advanced the generation and stored a fresh value.
   const mod = await freshModule();
   const goc = deferred<string>();
 
@@ -193,15 +197,15 @@ test('7b. concurrency: stale getOrCompute can overwrite a fresh refreshCache res
   assert.equal(refVal, 'fresh');
   assert.equal(mod.getCache('k'), 'fresh');
 
-  // The older getOrCompute compute resolves later and writes 'stale',
-  // overwriting the fresh value.
+  // The older getOrCompute compute resolves later with 'stale'.
+  // The generation guard must prevent it from overwriting 'fresh'.
   goc.resolve('stale');
   await pGoc;
 
   assert.equal(
     mod.getCache('k'),
-    'stale',
-    'CONFIRMED BUG: stale getOrCompute result overwrote fresh refreshCache result',
+    'fresh',
+    'stale getOrCompute result overwrote fresh refreshCache result (generation guard failed)',
   );
 });
 
@@ -243,11 +247,7 @@ test('9. cache hydrates from localStorage on first access (memory miss → stora
   assert.equal(calls, 0, 'compute ran despite persisted cache entry');
 });
 
-test('10. refreshCache does NOT register or clear inflight — duplicate compute confirmed by structure', async () => {
-  // Inspection-driven: refreshCache never touches the inflight map, so a
-  // concurrent getOrCompute cannot be shared with it. This test confirms the
-  // observable consequence (already covered in 7a) and documents that there is
-  // no inflight coordination on the refresh path.
+test('10. refreshCache supersedes older getOrCompute — duplicate compute but safe write', async () => {
   const mod = await freshModule();
   let calls = 0;
   const goc = deferred<string>();
@@ -262,4 +262,204 @@ test('10. refreshCache does NOT register or clear inflight — duplicate compute
   goc.resolve('stale');
   await pGoc;
   assert.equal(calls, 2);
+  assert.equal(mod.getCache('k'), 'fresh', 'older getOrCompute overwrote fresh refresh');
+});
+
+test('11. shouldCache=false prevents caching of error-like results', async () => {
+  const mod = await freshModule();
+  const r = await mod.getOrCompute(
+    'k',
+    () => Promise.resolve({ ok: false }),
+    (v) => (v as { ok: boolean }).ok === true,
+  );
+  assert.deepEqual(r, { ok: false });
+  assert.equal(mod.getCache('k'), undefined, 'uncacheable result was cached');
+});
+
+test('12. undefined result is not cached', async () => {
+  const mod = await freshModule();
+  let calls = 0;
+  const r1 = await mod.getOrCompute('k', () => {
+    calls += 1;
+    return Promise.resolve(undefined as unknown as string);
+  });
+  assert.equal(r1, undefined);
+  assert.equal(mod.getCache('k'), undefined, 'undefined was cached');
+
+  const r2 = await mod.getOrCompute('k', () => {
+    calls += 1;
+    return Promise.resolve('real');
+  });
+  assert.equal(r2, 'real');
+  assert.equal(calls, 2, 'second call did not re-run compute (undefined was cached)');
+});
+
+test('13. invalidateCache removes entry and prevents older operations from restoring it', async () => {
+  const mod = await freshModule();
+  await mod.getOrCompute('k', () => Promise.resolve('v'));
+  assert.equal(mod.getCache('k'), 'v');
+
+  mod.invalidateCache('k');
+  assert.equal(mod.getCache('k'), undefined, 'entry still present after invalidate');
+
+  let calls = 0;
+  const r = await mod.getOrCompute('k', () => {
+    calls += 1;
+    return Promise.resolve('v2');
+  });
+  assert.equal(r, 'v2');
+  assert.equal(calls, 1);
+});
+
+test('14. clearCache removes all entries and localStorage', async () => {
+  const mod = await freshModule();
+  await mod.getOrCompute('a', () => Promise.resolve('1'));
+  await mod.getOrCompute('b', () => Promise.resolve('2'));
+  assert.equal(mod.getCache('a'), '1');
+
+  mod.clearCache();
+  assert.equal(mod.getCache('a'), undefined);
+  assert.equal(mod.getCache('b'), undefined);
+  assert.equal(
+    localStorage.getItem('pulse:yt-cache:v1'),
+    null,
+    'localStorage not cleared',
+  );
+});
+
+test('15. corrupt localStorage is discarded without throwing', async () => {
+  const ls = makeLocalStorage();
+  ls.setItem('pulse:yt-cache:v1', '{not valid json');
+  globalThis.localStorage = ls;
+  moduleCounter += 1;
+  const mod = (await import(`../src/lib/youtubeCache.ts?t=${moduleCounter}`)) as CacheModule;
+
+  let calls = 0;
+  const r = await mod.getOrCompute('k', () => {
+    calls += 1;
+    return Promise.resolve('fresh');
+  });
+  assert.equal(r, 'fresh');
+  assert.equal(calls, 1, 'compute did not run despite corrupt storage');
+  assert.equal(mod.getCache('k'), 'fresh');
+});
+
+test('16. LRU eviction removes least-recently-used entry under MAX_ENTRIES', async () => {
+  const mod = await freshModule();
+  // MAX_ENTRIES is 120; fill beyond it to trigger eviction.
+  for (let i = 0; i < 125; i++) {
+    await mod.getOrCompute(`k${i}`, () => Promise.resolve(i));
+  }
+  // k0 should be evicted (oldest), k124 should exist (newest).
+  assert.equal(mod.getCache('k0'), undefined, 'oldest entry was not evicted');
+  assert.equal(mod.getCache('k124'), 124);
+});
+
+test('16b. hydration enforces the entry limit before serving cached values', async () => {
+  const ls = makeLocalStorage();
+  const entries: Record<string, { value: number; lastUsed: number }> = {};
+  for (let i = 0; i < 125; i += 1) {
+    entries[`k${i}`] = { value: i, lastUsed: i };
+  }
+  ls.setItem('pulse:yt-cache:v1', JSON.stringify({ version: 1, entries }));
+  globalThis.localStorage = ls;
+  moduleCounter += 1;
+  const mod = (await import(`../src/lib/youtubeCache.ts?t=${moduleCounter}`)) as CacheModule;
+
+  assert.equal(mod.getCache('k0'), undefined, 'oldest hydrated entry was not evicted');
+  assert.equal(mod.getCache('k124'), 124);
+});
+
+test('17. touch on getCache updates LRU order', async () => {
+  const mod = await freshModule();
+  for (let i = 0; i < 120; i++) {
+    await mod.getOrCompute(`k${i}`, () => Promise.resolve(i));
+  }
+  // Access k0 to make it most-recently-used.
+  assert.equal(mod.getCache('k0'), 0);
+  // Add one more, which should evict k1 (now oldest), not k0.
+  await mod.getOrCompute('k120', () => Promise.resolve(120));
+  assert.equal(mod.getCache('k0'), 0, 'touched entry was evicted');
+  assert.equal(mod.getCache('k1'), undefined, 'true LRU entry was not evicted');
+});
+
+test('18. persistence round-trips through localStorage', async () => {
+  const ls = makeLocalStorage();
+  globalThis.localStorage = ls;
+  moduleCounter += 1;
+  const mod1 = (await import(`../src/lib/youtubeCache.ts?t=${moduleCounter}`)) as CacheModule;
+  await mod1.getOrCompute('persist', () => Promise.resolve('value1'));
+
+  // Fresh module reads from same localStorage.
+  moduleCounter += 1;
+  const mod2 = (await import(`../src/lib/youtubeCache.ts?t=${moduleCounter}`)) as CacheModule;
+  let calls = 0;
+  const r = await mod2.getOrCompute('persist', () => {
+    calls += 1;
+    return Promise.resolve('should-not-run');
+  });
+  assert.equal(r, 'value1');
+  assert.equal(calls, 0, 'hydrated module re-ran compute for cached key');
+});
+
+test('19. equivalent search reuses cache — no duplicate compute on repeated calls', async () => {
+  const mod = await freshModule();
+  let calls = 0;
+  const compute = () => {
+    calls += 1;
+    return Promise.resolve({ songs: [], error: null });
+  };
+
+  await mod.getOrCompute('search:q=rock:max=10', compute, (r) => r.error === null);
+  await mod.getOrCompute('search:q=rock:max=10', compute, (r) => r.error === null);
+  await mod.getOrCompute('search:q=rock:max=10', compute, (r) => r.error === null);
+  assert.equal(calls, 1, 'repeated identical keys triggered more than one compute');
+});
+
+test('20. error results are not cached and allow retry', async () => {
+  const mod = await freshModule();
+  let calls = 0;
+  await mod.getOrCompute(
+    'errkey',
+    () => {
+      calls += 1;
+      return Promise.resolve({ data: null, error: 'API down' });
+    },
+    (r) => (r as { error: string | null }).error === null,
+  );
+  assert.equal(calls, 1);
+  assert.equal(mod.getCache('errkey'), undefined, 'error result was cached');
+
+  // Retry should call compute again.
+  const r = await mod.getOrCompute(
+    'errkey',
+    () => {
+      calls += 1;
+      return Promise.resolve({ data: 'ok', error: null });
+    },
+    (v) => (v as { error: string | null }).error === null,
+  );
+  assert.equal(calls, 2);
+  assert.deepEqual(r, { data: 'ok', error: null });
+});
+
+test('21. clearCache advances generations so stale inflight cannot write after clear', async () => {
+  const mod = await freshModule();
+  const goc = deferred<string>();
+  const pGoc = mod.getOrCompute('k', () => goc.promise);
+
+  mod.clearCache();
+
+  // Now a fresh getOrCompute fills the cache.
+  await mod.getOrCompute('k', () => Promise.resolve('fresh-after-clear'));
+
+  // The old inflight resolves with 'stale' — must not overwrite.
+  goc.resolve('stale');
+  await pGoc;
+
+  assert.equal(
+    mod.getCache('k'),
+    'fresh-after-clear',
+    'stale inflight wrote after clearCache',
+  );
 });

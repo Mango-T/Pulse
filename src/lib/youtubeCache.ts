@@ -84,6 +84,7 @@ function hydrateFromStorage(): void {
     for (const { key, entry } of valid) {
       memory.set(key, entry);
     }
+    evictToFit();
   } catch {
     // Corrupt or unreadable cache — start empty. Do not touch other keys.
   }
@@ -114,7 +115,7 @@ function approxByteSize(json: string): number {
 
 /** Evict least-recently-used entries until both count and byte limits are satisfied. */
 function evictToFit(extraBytes = 0): void {
-  while (memory.size >= MAX_ENTRIES) {
+  while (memory.size > MAX_ENTRIES) {
     const oldest = memory.keys().next().value;
     if (oldest === undefined) break;
     memory.delete(oldest);
