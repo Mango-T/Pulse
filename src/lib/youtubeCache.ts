@@ -205,10 +205,9 @@ export async function refreshCache<T>(
   compute: () => Promise<T>,
   shouldCache?: (result: T) => boolean,
 ): Promise<T> {
-  inflight.delete(key);
   const result = await compute();
 
-    if (result !== undefined && (!shouldCache || shouldCache(result))) {
+  if (result !== undefined && (!shouldCache || shouldCache(result))) {
     setCache(key, result);
   }
 
