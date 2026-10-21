@@ -16,7 +16,7 @@ export function YouTubePlayerView({ song, mode, onModeChange, error }: YouTubePl
   const [mounting, setMounting] = useState(false);
   const isYouTube = !!song?.youtubeId;
 
-  // Mount (or re-parent) the YT player whenever a YouTube song is active
+  // Mount the player once; changing display mode must not remount it.
   useEffect(() => {
     if (!isYouTube || !hostRef.current) return;
     let cancelled = false;
@@ -34,28 +34,21 @@ export function YouTubePlayerView({ song, mode, onModeChange, error }: YouTubePl
     return () => { cancelled = true; };
   }, [isYouTube]);
 
-  // When mode changes, re-parent the wrapper div into the current host
-  useEffect(() => {
-    if (isYouTube && hostRef.current) {
-      youtubePlayer.mount(hostRef.current);
-    }
-  }, [mode, isYouTube]);
   const showError = error && isYouTube;
   const showLoading = (mounting || (isYouTube && !playerReady)) && !showError;
 
   if (!isYouTube) return null;
 
+  const audioMode = mode === 'audio';
+
   return (
     <div className="px-4 md:px-6 pb-4 pt-2">
-      {/* Mode toggle */}
       <div className="flex items-center gap-2 mb-3">
         <div className="flex bg-neutral-800/80 rounded-lg p-0.5">
           <button
             onClick={() => onModeChange('video')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              mode === 'video'
-                ? 'bg-neutral-700 text-white'
-                : 'text-neutral-400 hover:text-white'
+              !audioMode ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'
             }`}
           >
             <Monitor size={14} />
@@ -64,9 +57,7 @@ export function YouTubePlayerView({ song, mode, onModeChange, error }: YouTubePl
           <button
             onClick={() => onModeChange('audio')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              mode === 'audio'
-                ? 'bg-neutral-700 text-white'
-                : 'text-neutral-400 hover:text-white'
+              audioMode ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'
             }`}
           >
             <Headphones size={14} />
@@ -75,7 +66,6 @@ export function YouTubePlayerView({ song, mode, onModeChange, error }: YouTubePl
         </div>
       </div>
 
-      {/* Error state */}
       {showError && (
         <div className="flex items-start gap-3 bg-red-950/30 border border-red-900/40 rounded-lg p-3 mb-3 max-w-2xl">
           <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
@@ -86,7 +76,6 @@ export function YouTubePlayerView({ song, mode, onModeChange, error }: YouTubePl
         </div>
       )}
 
-      {/* Loading state */}
       {showLoading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm py-4">
           <Loader2 size={16} className="animate-spin" />
@@ -94,32 +83,35 @@ export function YouTubePlayerView({ song, mode, onModeChange, error }: YouTubePl
         </div>
       )}
 
-      {/* Video mode: full player */}
-      {mode === 'video' && !showError && (
-        <div className="relative w-full aspect-video max-w-2xl rounded-xl overflow-hidden bg-black">
-          <div ref={hostRef} className="absolute inset-0 w-full h-full" />
-        </div>
-      )}
-
-      {/* Audio mode: compact player + album art */}
-      {mode === 'audio' && !showError && (
-        <div className="flex items-center gap-4 p-4 bg-neutral-900/60 rounded-xl max-w-2xl">
-          <img
-            src={song?.cover || ''}
-            alt={song?.title || ''}
-            className="w-24 h-24 rounded-lg object-cover shrink-0 shadow-lg"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-white text-base font-semibold truncate">{song?.title}</p>
-            <p className="text-neutral-400 text-sm truncate">{song?.artist}</p>
-            <p className="text-neutral-600 text-xs mt-1">Reproduzindo via YouTube</p>
-          </div>
-          {/* Compact YT player — visible to comply with YouTube policies */}
+      {!showError && (
+        <div
+          className={audioMode
+            ? 'flex items-center gap-4 p-4 bg-neutral-900/60 rounded-xl max-w-2xl'
+            : 'relative w-full aspect-video max-w-2xl rounded-xl overflow-hidden bg-black'}
+        >
+          {/* Keep the same host element mounted in both modes. */}
           <div
             ref={hostRef}
-            className="shrink-0 rounded-lg overflow-hidden border border-neutral-700/50"
-            style={{ width: 200, height: 113 }}
+            className={audioMode
+              ? 'order-3 shrink-0 rounded-lg overflow-hidden border border-neutral-700/50'
+              : 'absolute inset-0 w-full h-full'}
+            style={audioMode ? { width: 200, height: 113 } : undefined}
           />
+
+          {audioMode && (
+            <>
+              <img
+                src={song?.cover || ''}
+                alt={song?.title || ''}
+                className="order-1 w-24 h-24 rounded-lg object-cover shrink-0 shadow-lg"
+              />
+              <div className="order-2 min-w-0 flex-1">
+                <p className="text-white text-base font-semibold truncate">{song?.title}</p>
+                <p className="text-neutral-400 text-sm truncate">{song?.artist}</p>
+                <p className="text-neutral-600 text-xs mt-1">Reproduzindo via YouTube</p>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
