@@ -8,7 +8,7 @@ interface SearchHistoryProps {
   onClear: () => void;
 }
 
-const VISIBLE_ROWS = 5;
+const VISIBLE_ROWS = 3;
 
 export function SearchHistory({ history, onSelect, onRemove, onClear }: SearchHistoryProps) {
   if (history.length === 0) return null;
