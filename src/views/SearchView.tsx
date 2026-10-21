@@ -217,24 +217,6 @@ export function SearchView({
         />
         <div>
           <h2 className="text-white text-lg md:text-xl font-bold mb-4">Navegar por tudo</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {browseCategories.map((cat) => (
-              <div
-                key={cat.id}
-                className={`relative h-40 rounded-xl overflow-hidden cursor-pointer bg-gradient-to-br ${cat.color} group`}
-              >
-                <p className="absolute top-3 left-3 text-white font-bold text-lg z-10">
-                  {cat.label}
-                </p>
-                <img
-                  src={cat.cover}
-                  alt={cat.label}
-                  className="absolute -bottom-3 -right-3 w-20 h-20 rounded-lg rotate-25 object-cover shadow-xl group-hover:scale-110 transition-transform duration-300"
-                  loading="lazy"
-                />
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     );
