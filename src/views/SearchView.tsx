@@ -217,7 +217,6 @@ export function SearchView({
         />
         <div>
           <h2 className="text-white text-lg md:text-xl font-bold mb-4">Navegar por tudo</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               </div>
             ))}
           </div>
