@@ -216,7 +216,7 @@ export function SearchView({
           onClear={onClearHistory}
         />
         <div>
-          <h2 className="text-white text-lg md:text-xl font-bold mb-4">Visitados Recentemente</h2>
+          <h2 className="text-white text-lg md:text-xl font-bold mb-4">Reproduzidos Recentemente</h2>
         </div>
       </div>
     );
