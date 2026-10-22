@@ -7,6 +7,8 @@ import { ChannelAvatar } from '@/components/ChannelAvatar';
 import { SearchHistory } from '@/components/SearchHistory';
 import { songs as allSongs, playlists, artists, albums } from '@/data/mockData';
 import { searchYouTube, searchYouTubeChannels, searchYouTubePlaylists, isYouTubeConfigured } from '@/lib/youtube';
+import type { YouTubeSearchResult, YouTubeChannelResult } from '@/lib/youtube';
+import { getCache } from '@/lib/youtubeCache';
 
 type SearchFilter = 'all' | 'videos' | 'channels' | 'playlists';
 
@@ -206,7 +208,48 @@ export function SearchView({
     { id: 'c6', label: 'Folk', cover: allSongs[10].cover, color: 'from-orange-500 to-amber-700' },
   ];
 
+  // Restore previously cached YouTube results (no new API calls).
+  // Uses search history terms to look up existing cache entries.
+  const recentFromCache = useMemo(() => {
+    if (trimmed) return { songs: [], channels: [] };
+
+    const songs: Song[] = [];
+    const channels: Channel[] = [];
+    const seenSongIds = new Set<string>();
+    const seenChannelIds = new Set<string>();
+
+    for (const term of searchHistory) {
+      const t = term.trim();
+      if (!t) continue;
+
+      const songCache = getCache<YouTubeSearchResult>(`search:q=${t}:max=10`);
+      if (songCache && songCache.error === null) {
+        for (const song of songCache.songs) {
+          if (song.id && !seenSongIds.has(song.id)) {
+            seenSongIds.add(song.id);
+            songs.push(song);
+          }
+        }
+      }
+
+      const channelCache = getCache<YouTubeChannelResult>(`channels:q=${t}:max=5`);
+      if (channelCache && channelCache.error === null) {
+        for (const ch of channelCache.channels) {
+          if (ch.id && !seenChannelIds.has(ch.id)) {
+            seenChannelIds.add(ch.id);
+            channels.push(ch);
+          }
+        }
+      }
+    }
+
+    return { songs, channels };
+  }, [trimmed, searchHistory]);
+
   if (!trimmed) {
+    const hasRecentSongs = recentFromCache.songs.length > 0;
+    const hasRecentChannels = recentFromCache.channels.length > 0;
+
     return (
       <div className="px-4 md:px-6 pb-6 space-y-6">
         <SearchHistory
@@ -216,7 +259,46 @@ export function SearchView({
           onClear={onClearHistory}
         />
         <div>
-          <h2 className="text-white text-lg md:text-xl font-bold mb-4">Reproduzidos Recentemente</h2>
+          <h2 className="text-white text-lg md:text-xl font-bold mb-4">Buscados Recentemente</h2>
+          {(hasRecentSongs || hasRecentChannels) && (
+            <div className="space-y-6">
+              {hasRecentChannels && (
+                <section>
+                  <h3 className="text-white text-sm font-bold mb-3">Artistas e canais</h3>
+                  <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+                    {recentFromCache.channels.map((ch) => (
+                      <ChannelAvatar
+                        key={ch.id}
+                        channel={ch}
+                        onClick={() => onOpenChannel(ch.id)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+              {hasRecentSongs && (
+                <section>
+                  <h3 className="text-white text-sm font-bold mb-3">Músicas e vídeos</h3>
+                  <div className="bg-neutral-900/40 rounded-xl p-2 md:p-4">
+                    <div className="flex flex-col gap-1">
+                      {recentFromCache.songs.map((song, i) => (
+                        <SongRow
+                          key={song.id}
+                          song={song}
+                          index={i}
+                          isCurrent={currentSongId === song.id}
+                          isPlaying={isPlaying && currentSongId === song.id}
+                          isFavorite={favorites.has(song.id)}
+                          onPlay={() => onPlaySong(song, recentFromCache.songs)}
+                          onToggleFavorite={() => onToggleFavorite(song)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

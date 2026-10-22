@@ -9,6 +9,7 @@ interface TopBarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onSubmitSearch: () => void;
+  onClearSearch: () => void;
   isLoggedIn: boolean;
   onSignInWithGoogle: () => void;
 }
@@ -29,12 +30,14 @@ const viewTitles: Record<View, string> = {
   playlist: 'Playlist',
   'my-playlist': 'Minha Playlist',
 };
+
 export function TopBar({
   view,
   onNavigate,
   searchQuery,
   onSearchChange,
   onSubmitSearch,
+  onClearSearch,
   isLoggedIn,
   onSignInWithGoogle,
 }: TopBarProps) {
@@ -44,7 +47,7 @@ export function TopBar({
   return (
     <>
       <div className="flex items-center gap-4 px-4 md:px-6 py-4 bg-transparent">
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button
             type="button"
             onClick={() => onNavigate('home')}
@@ -66,13 +69,13 @@ export function TopBar({
 
         {view === 'search' ? (
           <form
-            className="flex-1 max-w-md relative"
+            className="flex-1 min-w-0 max-w-md relative"
             onSubmit={(e) => {
               e.preventDefault();
               onSubmitSearch();
             }}
           >
-            <div className="relative">
+            <div className="relative w-full">
               <input
                 type="text"
                 value={searchQuery}
@@ -80,19 +83,33 @@ export function TopBar({
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
                 placeholder="O que você quer ouvir?"
-                className={`w-full bg-neutral-800 text-white rounded-lg pl-4 pr-10 py-2.5 text-sm placeholder:text-neutral-500 outline-none transition-all duration-200 ${
+                className={`block w-full box-border bg-neutral-800 text-white rounded-lg pl-4 pr-20 py-2.5 text-sm placeholder:text-neutral-500 outline-none transition-all duration-200 ${
                   searchFocused
                     ? 'ring-2 ring-emerald-400/60 bg-neutral-700'
                     : ''
                 }`}
               />
-              <button
-                type="submit"
-                aria-label="Buscar"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors md:pointer-events-none md:text-neutral-600"
-              >
-                <Search size={18} />
-              </button>
+
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    aria-label="Limpar pesquisa"
+                    onClick={onClearSearch}
+                    className="w-6 h-6 shrink-0 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  aria-label="Buscar"
+                  className="w-6 h-6 shrink-0 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                >
+                  <Search size={18} />
+                </button>
+              </div>
             </div>
           </form>
         ) : (
@@ -101,25 +118,7 @@ export function TopBar({
           </h1>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onNavigate('search')}
-            aria-label="Buscar"
-            className="w-9 h-9 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-300 md:hidden"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="w-4 h-4"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          </button>
-
+        <div className="ml-auto flex items-center gap-3 shrink-0">
           {!isLoggedIn && (
             <button
               type="button"
@@ -168,29 +167,39 @@ export function TopBar({
             </p>
 
             <div className="flex flex-col gap-3">
-              
-<button
-  type="button"
-  onClick={() => {
-    setLoginOpen(false);
-    onSignInWithGoogle();
-  }}
-  className="w-full flex items-center justify-center gap-3 rounded-full bg-white text-neutral-700 border border-neutral-300 py-3 px-4 font-medium hover:bg-neutral-50 transition-colors shadow-sm"
->
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 48 48"
-    className="w-5 h-5 shrink-0"
-    aria-hidden="true"
-  >
-    <path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15Z" />
-    <path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44Z" />
-    <path fill="#FBBC05" d="M12.6 27.7a12 12 0 0 1 0-7.4V15H5.8a20 20 0 0 0 0 18Z" />
-    <path fill="#EA4335" d="M24 12.9c3 0 5.7 1 7.8 3.1l5.8-5.8C34.1 6.9 29.5 4.8 24 4.8A20 20 0 0 0 5.8 15l6.8 5.3c1.6-4.8 6.1-7.4 11.4-7.4Z" />
-  </svg>
-  Continuar com Google
-</button>
-
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginOpen(false);
+                  onSignInWithGoogle();
+                }}
+                className="w-full flex items-center justify-center gap-3 rounded-full bg-white text-neutral-700 border border-neutral-300 py-3 px-4 font-medium hover:bg-neutral-50 transition-colors shadow-sm"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 48 48"
+                  className="w-5 h-5 shrink-0"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="#4285F4"
+                    d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15Z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44Z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M12.6 27.7a12 12 0 0 1 0-7.4V15H5.8a20 20 0 0 0 0 18Z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M24 12.9c3 0 5.7 1 7.8 3.1l5.8-5.8C34.1 6.9 29.5 4.8 24 4.8A20 20 0 0 0 5.8 15l6.8 5.3c1.6-4.8 6.1-7.4 11.4-7.4Z"
+                  />
+                </svg>
+                Continuar com Google
+              </button>
             </div>
           </div>
         </div>

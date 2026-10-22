@@ -125,6 +125,11 @@ export function App() {
     handleCommitSearch(searchQuery);
   }, [searchQuery, handleCommitSearch]);
 
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setCommittedQuery('');
+  }, []);
+
   const handlePlaySong = (song: Song, queue?: Song[]) => {
     player.playSong(song, queue);
   };
@@ -167,6 +172,7 @@ export function App() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onSubmitSearch={handleSubmitSearch}
+            onClearSearch={handleClearSearch}
             isLoggedIn={!!profile}
             onSignInWithGoogle={signInWithGoogle}
           />
