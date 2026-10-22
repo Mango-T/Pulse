@@ -14,7 +14,7 @@ import { TopBar } from '@/components/TopBar';
 import { PlayerBar } from '@/components/PlayerBar';
 import { YouTubePlayerView } from '@/components/YouTubePlayerView';
 import { HomeView } from '@/views/HomeView';
-import { SearchView } from '@/views/SearchView';
+import { SearchView } from '@/views/SearchView';s
 import { LibraryView } from '@/views/LibraryView';
 import { ChannelView } from '@/views/ChannelView';
 import { PlaylistView } from '@/views/PlaylistView';
